@@ -7,7 +7,7 @@
 
 struct Trie {
     private var children: [String: Trie] = [:]
-    var value: Int?
+    private(set) var value: Int?
     
     var keys: Dictionary<String, Trie>.Keys { return children.keys }
     

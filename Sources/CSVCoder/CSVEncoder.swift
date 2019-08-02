@@ -18,92 +18,71 @@ public struct CSVEncodingOptions: OptionSet {
 }
 
 protocol EncodingContext: AnyObject {
-    var options: CSVEncodingOptions { get }
     var userInfo: [CodingUserInfoKey: Any] { get }
     
-    func add(unescaped: String, to header: [CodingKey]) throws
-    func finalize() -> (header: [String], value: [String])
+    func add(unescaped: String, to path: [CodingKey]) throws
+    func finalize() -> (fields: [String], values: [String])
 }
 
 class UnconstraintedEncodingContext: EncodingContext {
     private let encoder: CSVEncoder
-    
-    private var headers: [String] = []
-    private var values: [String] = []
+    private var fields: [String] = [], values: [String] = []
 
-    var options: CSVEncodingOptions { return encoder.options }
     var userInfo: [CodingUserInfoKey: Any] { return encoder.userInfo }
-    var separator: Character { return encoder.separator }
-    var subheaderSeparator: String
 
     init(encoder: CSVEncoder) {
         self.encoder = encoder
-        self.subheaderSeparator = String(encoder.subheaderSeparator)
     }
     
-    private func escape(_ value: String) -> String {
-        return value.escaped(separator: separator, forced: options.contains(.alwaysQuote))
+    func add(unescaped: String, to codingPath: [CodingKey]) throws {
+        fields.append(encoder.field(for: codingPath))
+        values.append(encoder.escape(unescaped))
     }
     
-    func add(unescaped: String, to header: [CodingKey]) throws {
-        headers.append(header.map { $0.stringValue }.joined(separator: subheaderSeparator))
-        values.append(escape(unescaped))
-    }
-    
-    func finalize() -> (header: [String], value: [String]) {
-        return (headers, values)
+    func finalize() -> (fields: [String], values: [String]) {
+        return (fields, values)
     }
 }
 
 class ConstrainedEncodingContext: EncodingContext {
     private let encoder: CSVEncoder
-    let permitted: [String: Int], headers: [String]
-
-    var options: CSVEncodingOptions { return encoder.options }
-    var userInfo: [CodingUserInfoKey: Any] { return encoder.userInfo }
-    var separator: Character { return encoder.separator }
-    let subheaderSeparator: String
-
+    private let fields: [String], permitted: [String: Int]
     private var values: [String?]
-    
-    init(encoder: CSVEncoder, headers: [String]) throws {
+
+    var userInfo: [CodingUserInfoKey: Any] { return encoder.userInfo }
+
+    init(encoder: CSVEncoder, fields: [String]) throws {
         self.encoder = encoder
-        self.subheaderSeparator = String(encoder.subheaderSeparator)
-        self.headers = headers
+        self.fields = fields
         
-        permitted = try Dictionary(zip(headers, 0...)) { _, key -> Int in
+        permitted = try Dictionary(zip(fields, 0...)) { _, key -> Int in
             throw EncodingError.invalidValue(Void.self, .init(codingPath: [], debugDescription: "Duplicated key \(key)"))
         }
-        values = Array(repeating: nil, count: headers.count)
+        values = Array(repeating: nil, count: fields.count)
     }
     
-    private func escape(_ value: String) -> String {
-        return value.escaped(separator: separator, forced: options.contains(.alwaysQuote))
-    }
-    
-    func add(unescaped: String, to header: [CodingKey]) throws {
-        let headerString = header.map { $0.stringValue }.joined(separator: subheaderSeparator)
-        guard let index = permitted[headerString] else {
-            throw EncodingError.invalidValue(unescaped, .init(codingPath: header, debugDescription: "Invalid key"))
+    func add(unescaped: String, to codingPath: [CodingKey]) throws {
+        guard let index = permitted[encoder.field(for: codingPath)] else {
+            throw EncodingError.invalidValue(unescaped, .init(codingPath: codingPath, debugDescription: "Invalid key"))
         }
         guard values[index] == nil else {
-            throw EncodingError.invalidValue(unescaped, .init(codingPath: header, debugDescription: "Repeated key"))
+            throw EncodingError.invalidValue(unescaped, .init(codingPath: codingPath, debugDescription: "Repeated key"))
         }
         
-        values[index] = escape(unescaped)
+        values[index] = encoder.escape(unescaped)
     }
     
-    func finalize() -> (header: [String], value: [String]) {
-        return (headers, values.map { $0 ?? "" })
+    func finalize() -> (fields: [String], values: [String]) {
+        return (fields, values.map { $0 ?? "" })
     }
 }
 
 struct CSVInternalEncoder: Encoder {
     let context: EncodingContext, codingPath: [CodingKey]
     
-    var userInfo: [CodingUserInfoKey : Any] { return context.userInfo }
+    var userInfo: [CodingUserInfoKey: Any] { return context.userInfo }
 
-    func container<Key>(keyedBy type: Key.Type) -> KeyedEncodingContainer<Key> where Key : CodingKey {
+    func container<Key>(keyedBy type: Key.Type) -> KeyedEncodingContainer<Key> where Key: CodingKey {
         return KeyedEncodingContainer(CSVKeyedEncodingContainer(context: context, codingPath: codingPath))
     }
     
@@ -123,25 +102,22 @@ private struct CSVKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingContainer
         return codingPath + [key]
     }
 
-    mutating func encodeNil(forKey key: Key) throws { try encode(unescaped: "", forKey: key) }
-    mutating func encode(_ value: Bool, forKey key: Key) throws { try encode(unescaped: value ? "true" : "false", forKey: key) }
-    mutating func encode(_ value: Double, forKey key: Key) throws { try encode(unescaped: String(value), forKey: key) }
-    mutating func encode(_ value: Float, forKey key: Key) throws { try encode(unescaped: String(value), forKey: key) }
-    mutating func encode(_ value: String, forKey key: Key) throws { try encode(unescaped: value, forKey: key) }
-    mutating func encode<T>(_ value: T, forKey key: Key) throws where T : Encodable, T : FixedWidthInteger {
-        try encode(unescaped: String(value), forKey: key)
+    mutating func encodeNil(forKey key: Key) throws { try encode("", forKey: key) }
+
+    mutating func encode(_ value: String, forKey key: Key) throws {
+        try context.add(unescaped: value, to: nextPath(for: key))
     }
-    
-    private mutating func encode(unescaped: String, forKey key: Key) throws {
-        try context.add(unescaped: unescaped, to: nextPath(for: key))
+
+    mutating func encode<T>(_ value: T, forKey key: Key) throws where T: Encodable, T: LosslessStringConvertible {
+        try encode(String(value), forKey: key)
     }
-    
-    mutating func encode<T>(_ value: T, forKey key: Key) throws where T : Encodable {
+
+    mutating func encode<T>(_ value: T, forKey key: Key) throws where T: Encodable {
         let encoder = CSVInternalEncoder(context: context, codingPath: nextPath(for: key))
         try value.encode(to: encoder)
     }
-    
-    mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> where NestedKey : CodingKey {
+
+    mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> where NestedKey: CodingKey {
         return KeyedEncodingContainer(CSVKeyedEncodingContainer<NestedKey>(context: context, codingPath: nextPath(for: key)))
     }
     
@@ -159,9 +135,8 @@ private struct CSVKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingContainer
 }
 
 private struct CSVUnkeyedEncodingContainer: UnkeyedEncodingContainer, SingleValueEncodingContainer {
-    let context: EncodingContext, codingPath: [CodingKey]
+    let context: EncodingContext, codingPath: [CodingKey], isSingle: Bool
     var count = 0
-    let isSingle: Bool
     
     init(context: EncodingContext, codingPath: [CodingKey], isSingle: Bool) {
         self.context = context
@@ -181,24 +156,22 @@ private struct CSVUnkeyedEncodingContainer: UnkeyedEncodingContainer, SingleValu
         }
     }
     
-    mutating func encodeNil() throws { try encode(unescaped: "") }
-    mutating func encode(_ value: Bool) throws { try encode(unescaped: value ? "true": "false") }
-    mutating func encode(_ value: Double) throws { try encode(unescaped: String(value)) }
-    mutating func encode(_ value: Float) throws { try encode(unescaped: String(value)) }
-    mutating func encode(_ value: String) throws { try encode(unescaped: value) }
-    mutating func encode<T>(_ value: T) throws where T : Encodable, T : FixedWidthInteger {
-        try encode(unescaped: String(value))
+    mutating func encodeNil() throws { try encode("") }
+
+    mutating func encode(_ value: String) throws {
+        try context.add(unescaped: value, to: nextPath())
     }
 
-    private mutating func encode(unescaped: String) throws {
-        try context.add(unescaped: unescaped, to: nextPath())
+    mutating func encode<T>(_ value: T) throws where T: Encodable, T: LosslessStringConvertible {
+        try encode(String(value))
     }
-    mutating func encode<T>(_ value: T) throws where T : Encodable {
+
+    mutating func encode<T>(_ value: T) throws where T: Encodable {
         let encoder = CSVInternalEncoder(context: context, codingPath: nextPath())
         try value.encode(to: encoder)
     }
     
-    mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> where NestedKey : CodingKey {
+    mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> where NestedKey: CodingKey {
         return KeyedEncodingContainer(CSVKeyedEncodingContainer(context: context, codingPath: nextPath()))
     }
     

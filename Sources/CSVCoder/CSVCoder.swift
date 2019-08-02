@@ -1,23 +1,37 @@
 public struct CSVEncoder {
-    let separator, subheaderSeparator: Character
-    
     public var options: CSVEncodingOptions = []
     public var userInfo: [CodingUserInfoKey: Any] = [:]
     
+    private let separator: Character, subheaderSeparator: String
+    
     init(separator: Character = ",", subheaderSeparator: Character = ".") {
         self.separator = separator
-        self.subheaderSeparator = subheaderSeparator
+        self.subheaderSeparator = String(subheaderSeparator)
+    }
+
+    func escape(_ value: String) -> String {
+        return value.escaped(separator: separator, forced: options.contains(.alwaysQuote))
+    }
+
+    func field(for path: [CodingKey]) -> String {
+        return path.map { $0.stringValue }.joined(separator: subheaderSeparator)
+    }
+
+    func encode<S>(_ values: S) throws -> String where S: Sequence, S.Element: Encodable {
+        var result = ""
+        try encode(values, into: &result)
+        return result
     }
     
-    func encode<S: Sequence>(_ values: S) throws -> String where S.Element: Encodable {
-        var headers: [String]?, results: [String] = []
+    func encode<S, Output>(_ values: S, into output: inout Output) throws where S: Sequence, S.Element: Encodable, Output: TextOutputStream {
+        var fields: [String]?
         let stringSeparator = String(separator)
         
         for value in values {
             let context: EncodingContext
             if !options.contains(.nonHomogeneous),
-                let headers = headers {
-                context = try ConstrainedEncodingContext(encoder: self, headers: headers)
+                let fields = fields {
+                context = try ConstrainedEncodingContext(encoder: self, fields: fields)
             } else {
                 context = UnconstraintedEncodingContext(encoder: self)
             }
@@ -25,23 +39,21 @@ public struct CSVEncoder {
             let encoder = CSVInternalEncoder(context: context, codingPath: [])
             try value.encode(to: encoder)
             
-            let (newHeaders, newValue) = context.finalize()
+            let (newFields, entry) = context.finalize()
             
-            if headers == nil {
-                results.append(newHeaders.joined(separator: stringSeparator))
-                headers = newHeaders
+            if fields == nil {
+                fields = newFields
+                print(newFields.joined(separator: stringSeparator), to: &output)
             }
-            results.append(newValue.joined(separator: stringSeparator))
+            print(entry.joined(separator: stringSeparator), to: &output)
         }
-        
-        return results.joined(separator: "\r\n")
     }
 }
 
 public struct CSVDecoder {
-    let separator, subheaderSeparator: Character
-    
     public var userInfo: [CodingUserInfoKey: Any] = [:]
+
+    private let separator, subheaderSeparator: Character
     
     init(separator: Character = ",", subheaderSeparator: Character = ".") {
         self.separator = separator
@@ -63,7 +75,7 @@ public struct CSVDecoder {
                 guard let currentHeaders = headers else {
                     headers = Trie()
                     for (offset, field) in buffer.enumerated() {
-                        let path = field.split(separator: subheaderSeparator).map { String($0) }
+                        let path = field.split(separator: subheaderSeparator).map(String.init)
                         guard headers!.add(offset, to: path) else {
                             throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Duplicated key \(field)"))
                         }
@@ -83,14 +95,9 @@ public struct CSVDecoder {
                 throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Invalid CSV format"))
             }
         }
-        
-        if !buffer.isEmpty,
-            let currentHeaders = headers {
-            let context = try DecodingContext(decoder: self, data: buffer)
-            let decoder = CSVInternalDecoder(context: context, headers: currentHeaders, codingPath: [])
-            try results.append(T(from: decoder))
-        }
-        
+       
+        assert(buffer.isEmpty)
         return results
     }
 }
+

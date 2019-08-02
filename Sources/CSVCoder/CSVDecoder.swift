@@ -26,7 +26,7 @@ class DecodingContext {
 
 struct CSVInternalDecoder: Decoder {
     let context: DecodingContext, codingPath: [CodingKey], headers: Trie
-    var userInfo: [CodingUserInfoKey : Any] { return context.userInfo }
+    var userInfo: [CodingUserInfoKey: Any] { return context.userInfo }
     
     init(context: DecodingContext, headers: Trie, codingPath: [CodingKey]) {
         self.context = context
@@ -34,7 +34,7 @@ struct CSVInternalDecoder: Decoder {
         self.codingPath = codingPath
     }
     
-    func container<Key>(keyedBy type: Key.Type) throws -> KeyedDecodingContainer<Key> where Key : CodingKey {
+    func container<Key>(keyedBy type: Key.Type) throws -> KeyedDecodingContainer<Key> where Key: CodingKey {
         return KeyedDecodingContainer(CSVKeyedDecodingContainer(context: context, headers: headers, codingPath: codingPath))
     }
     
@@ -56,7 +56,7 @@ private struct CSVKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainer
         self.headers = headers
         self.codingPath = codingPath
     
-        allKeys = headers.keys.compactMap { Key(stringValue: $0) }
+        allKeys = headers.keys.compactMap { Key(stringValue: String($0)) }
         allUniqueKeys = Set(allKeys.map { $0.stringValue })
     }
     
@@ -78,39 +78,6 @@ private struct CSVKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainer
         return string.isEmpty
     }
     
-    func decode(_ type: Bool.Type, forKey key: Key) throws -> Bool {
-        let string = try decode(String.self, forKey: key)
-        switch string.lowercased() {
-        case "true": return true
-        case "false": return false
-        default: throw DecodingError.typeMismatch(Bool.self, .init(codingPath: nextPath(for: key), debugDescription: ""))
-        }
-    }
-    
-    func decode(_ type: Double.Type, forKey key: Key) throws -> Double {
-        let string = try decode(String.self, forKey: key)
-        guard let result = Double(string) else {
-            throw DecodingError.typeMismatch(Double.self, .init(codingPath: nextPath(for: key), debugDescription: ""))
-        }
-        return result
-    }
-    
-    func decode(_ type: Float.Type, forKey key: Key) throws -> Float {
-        let string = try decode(String.self, forKey: key)
-        guard let result = Float(string) else {
-            throw DecodingError.typeMismatch(Float.self, .init(codingPath: nextPath(for: key), debugDescription: ""))
-        }
-        return result
-    }
-    
-    func decode<T>(_ type: T.Type, forKey key: Key) throws -> T where T : Decodable, T : FixedWidthInteger {
-        let string = try decode(String.self, forKey: key)
-        guard let result = T(string) else {
-            throw DecodingError.typeMismatch(T.self, .init(codingPath: nextPath(for: key), debugDescription: ""))
-        }
-        return result
-    }
-    
     func decode(_ type: String.Type, forKey key: Key) throws -> String {
         guard let index = headers[key]?.value else {
             throw DecodingError.keyNotFound(key, .init(codingPath: codingPath, debugDescription: "Key not found"))
@@ -118,17 +85,25 @@ private struct CSVKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainer
         return context.value(at: index)
     }
 
-    func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type, forKey key: Key) throws -> KeyedDecodingContainer<NestedKey> where NestedKey : CodingKey {
+    func decode<T>(_ type: T.Type, forKey key: Key) throws -> T where T: Decodable, T: LosslessStringConvertible {
+        let string = try decode(String.self, forKey: key)
+        guard let result = T(string) else {
+            throw DecodingError.typeMismatch(T.self, .init(codingPath: nextPath(for: key), debugDescription: ""))
+        }
+        return result
+    }
+    
+    func decode<T>(_ type: T.Type, forKey key: Key) throws -> T where T: Decodable {
+        let decoder = try CSVInternalDecoder(context: context, headers: header(for: key), codingPath: nextPath(for: key))
+        return try T(from: decoder)
+    }
+    
+    func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type, forKey key: Key) throws -> KeyedDecodingContainer<NestedKey> where NestedKey: CodingKey {
         return try .init(CSVKeyedDecodingContainer<NestedKey>(context: context, headers: header(for: key), codingPath: nextPath(for: key)))
     }
     
     func nestedUnkeyedContainer(forKey key: Key) throws -> UnkeyedDecodingContainer {
         return try CSVUnkeyedDecodingContainer(context: context, headers: header(for: key), codingPath: nextPath(for: key))
-    }
-    
-    func decode<T>(_ type: T.Type, forKey key: Key) throws -> T where T : Decodable {
-        let decoder = try CSVInternalDecoder(context: context, headers: header(for: key), codingPath: nextPath(for: key))
-        return try T(from: decoder)
     }
     
     func superDecoder() throws -> Decoder {
@@ -181,18 +156,12 @@ private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
         return codingPath + [currentKey()]
     }
     
-    mutating func decodeNil() -> Bool {
-        let string = try? decode(String.self)
-        return string?.isEmpty ?? true
-    }
-    
-    mutating func decode(_ type: Bool.Type) throws -> Bool {
-        let string = try decode(String.self)
-        switch string.lowercased() {
-        case "true": return true
-        case "false": return false
-        default: throw DecodingError.typeMismatch(Bool.self, .init(codingPath: currentPath(), debugDescription: ""))
+    mutating func decodeNil() throws -> Bool {
+        let isNil = try decode(String.self).isEmpty
+        if !isNil {
+            currentIndex -= 1
         }
+        return isNil
     }
     
     mutating func decode(_ type: String.Type) throws -> String {
@@ -201,24 +170,8 @@ private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
         }
         return context.value(at: index)
     }
-    
-    mutating func decode(_ type: Double.Type) throws -> Double {
-        let string = try decode(String.self)
-        guard let result = Double(string) else {
-            throw DecodingError.typeMismatch(Double.self, .init(codingPath: currentPath(), debugDescription: ""))
-        }
-        return result
-    }
-    
-    mutating func decode(_ type: Float.Type) throws -> Float {
-        let string = try decode(String.self)
-        guard let result = Float(string) else {
-            throw DecodingError.typeMismatch(Double.self, .init(codingPath: currentPath(), debugDescription: ""))
-        }
-        return result
-    }
-    
-    mutating func decode<T>(_ type: T.Type) throws -> T where T : Decodable, T : FixedWidthInteger {
+
+    mutating func decode<T>(_ type: T.Type) throws -> T where T: Decodable, T: LosslessStringConvertible {
         let string = try decode(String.self)
         guard let result = T(string) else {
             throw DecodingError.typeMismatch(Double.self, .init(codingPath: currentPath(), debugDescription: ""))
@@ -226,13 +179,13 @@ private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
         return result
     }
     
-    mutating func decode<T>(_ type: T.Type) throws -> T where T : Decodable {
+    mutating func decode<T>(_ type: T.Type) throws -> T where T: Decodable {
         let header = try nextHeader()
         let decoder = CSVInternalDecoder(context: context, headers: header, codingPath: currentPath())
         return try T(from: decoder)
     }
     
-    mutating func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type) throws -> KeyedDecodingContainer<NestedKey> where NestedKey : CodingKey {
+    mutating func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type) throws -> KeyedDecodingContainer<NestedKey> where NestedKey: CodingKey {
         let header = try nextHeader()
         return KeyedDecodingContainer(CSVKeyedDecodingContainer(context: context, headers: header, codingPath: currentPath()))
     }
@@ -252,17 +205,8 @@ private struct CSVSingleValueDecodingContainer: SingleValueDecodingContainer {
     let context: DecodingContext, headers: Trie, codingPath: [CodingKey]
     
     func decodeNil() -> Bool {
-        let string = try? decode(String.self)
-        return string?.isEmpty ?? true
-    }
-    
-    func decode(_ type: Bool.Type) throws -> Bool {
-        let string = try decode(String.self)
-        switch string.lowercased() {
-        case "true": return true
-        case "false": return false
-        default: throw DecodingError.typeMismatch(Bool.self, .init(codingPath: codingPath, debugDescription: ""))
-        }
+        let isNil = try? decode(String.self).isEmpty
+        return isNil ?? true
     }
     
     func decode(_ type: String.Type) throws -> String {
@@ -272,23 +216,7 @@ private struct CSVSingleValueDecodingContainer: SingleValueDecodingContainer {
         return context.value(at: index)
     }
     
-    func decode(_ type: Double.Type) throws -> Double {
-        let string = try decode(String.self)
-        guard let result = Double(string) else {
-            throw DecodingError.typeMismatch(Double.self, .init(codingPath: codingPath, debugDescription: ""))
-        }
-        return result
-    }
-    
-    func decode(_ type: Float.Type) throws -> Float {
-        let string = try decode(String.self)
-        guard let result = Float(string) else {
-            throw DecodingError.typeMismatch(Double.self, .init(codingPath: codingPath, debugDescription: ""))
-        }
-        return result
-    }
-    
-    func decode<T>(_ type: T.Type) throws -> T where T : Decodable, T : FixedWidthInteger {
+    func decode<T>(_ type: T.Type) throws -> T where T: Decodable, T: LosslessStringConvertible {
         let string = try decode(String.self)
         guard let result = T(string) else {
             throw DecodingError.typeMismatch(Double.self, .init(codingPath: codingPath, debugDescription: ""))
@@ -296,12 +224,12 @@ private struct CSVSingleValueDecodingContainer: SingleValueDecodingContainer {
         return result
     }
     
-    func decode<T>(_ type: T.Type) throws -> T where T : Decodable {
+    func decode<T>(_ type: T.Type) throws -> T where T: Decodable {
         let decoder = CSVInternalDecoder(context: context, headers: headers, codingPath: codingPath)
         return try T(from: decoder)
     }
     
-    mutating func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type) throws -> KeyedDecodingContainer<NestedKey> where NestedKey : CodingKey {
+    mutating func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type) throws -> KeyedDecodingContainer<NestedKey> where NestedKey: CodingKey {
         return KeyedDecodingContainer(CSVKeyedDecodingContainer(context: context, headers: headers, codingPath: codingPath))
     }
     
@@ -313,3 +241,4 @@ private struct CSVSingleValueDecodingContainer: SingleValueDecodingContainer {
         return CSVInternalDecoder(context: context, headers: headers, codingPath: codingPath)
     }
 }
+

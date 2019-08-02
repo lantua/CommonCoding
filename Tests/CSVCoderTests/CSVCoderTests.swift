@@ -35,6 +35,19 @@ final class CSVCoderTests: XCTestCase {
             let roundtrip = try decoder.decode(Int.self, string)
             XCTAssertEqual(values, roundtrip)
         }
+
+        do {
+            struct Test: Codable, Hashable {
+                var a: Int?, b: Double?, c: Float?, d: String?, e: Bool?
+            }
+            let values = [
+                Test(a: 0, b: 0, c: 0, d: "asd", e: true),
+                Test(a: nil, b: nil, c: nil, d: nil, e: nil)
+            ]
+            let string = try encoder.encode(values)
+            let roundtrip = try decoder.decode(Test.self, string)
+            XCTAssertEqual(values, roundtrip)
+        }
     }
     
     func testEscaping() throws {

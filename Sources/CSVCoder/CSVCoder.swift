@@ -43,7 +43,9 @@ public struct CSVEncoder {
             
             if fields == nil {
                 fields = newFields
-                print(newFields.joined(separator: stringSeparator), to: &output)
+                if !options.contains(.skipHeader) {
+                    print(newFields.joined(separator: stringSeparator), to: &output)
+                }
             }
             print(entry.joined(separator: stringSeparator), to: &output)
         }
@@ -55,7 +57,7 @@ public struct CSVDecoder {
 
     private let separator, subheaderSeparator: Character
     
-    init(separator: Character = ",", subheaderSeparator: Character = ".") {
+    public init(separator: Character = ",", subheaderSeparator: Character = ".") {
         self.separator = separator
         self.subheaderSeparator = subheaderSeparator
     }

@@ -15,6 +15,7 @@ public struct CSVEncodingOptions: OptionSet {
     
     public static let alwaysQuote       = CSVEncodingOptions(rawValue: 1 << 0)
     public static let nonHomogeneous    = CSVEncodingOptions(rawValue: 1 << 1)
+    public static let skipHeader        = CSVEncodingOptions(rawValue: 1 << 2)
 }
 
 protocol EncodingContext: AnyObject {

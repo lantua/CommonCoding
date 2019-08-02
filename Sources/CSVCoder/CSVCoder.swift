@@ -4,7 +4,7 @@ public struct CSVEncoder {
     
     private let separator: Character, subheaderSeparator: String
     
-    init(separator: Character = ",", subheaderSeparator: Character = ".") {
+    public init(separator: Character = ",", subheaderSeparator: Character = ".") {
         self.separator = separator
         self.subheaderSeparator = String(subheaderSeparator)
     }

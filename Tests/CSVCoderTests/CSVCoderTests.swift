@@ -41,8 +41,9 @@ final class CSVCoderTests: XCTestCase {
                 var a: Int?, b: Double?, c: Float?, d: String?, e: Bool?
             }
             let values = [
-                Test(a: 0, b: 0, c: 0, d: "asd", e: true),
-                Test(a: nil, b: nil, c: nil, d: nil, e: nil)
+                Test(a: nil, b: nil, c: nil, d: nil, e: true),
+                Test(a: nil, b: 0.3, c: nil, d: "dsta", e: nil),
+                Test(a: 2, b: 0.3, c: nil, d: "dsta", e: false),
             ]
             let string = try encoder.encode(values)
             let roundtrip = try decoder.decode(Test.self, string)

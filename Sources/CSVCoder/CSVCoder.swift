@@ -62,7 +62,7 @@ public struct CSVDecoder {
         self.subheaderSeparator = subheaderSeparator
     }
     
-    public func decode<S, T>(_ type: T.Type, _ string: S) throws -> [T] where T: Decodable, S: StringProtocol {
+    public func decode<S, T>(_ type: T.Type, _ string: S) throws -> [T] where T: Decodable, S: Sequence, S.Element == Character {
         let tokens = UnescapedCSVTokens(base: string, separator: separator)
         
         var buffer: [String] = [], headers: Trie?, results: [T] = []

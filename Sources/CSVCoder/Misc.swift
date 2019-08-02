@@ -6,23 +6,6 @@
 //
 
 extension StringProtocol {
-    fileprivate func unescaped() -> String {
-        assert(first == "\"" && last == "\"")
-        
-        var ignoreNext = false
-        return String(dropFirst().dropLast().filter { character -> Bool in
-            guard !ignoreNext else {
-                ignoreNext = false
-                return false
-            }
-            
-            if character == "\"" {
-                ignoreNext = true
-            }
-            return true
-        })
-    }
-
     /// Return true if the string needs escaping (and is now escaped)
     func escaped(separator: Character, forced: Bool) -> String {
         func needEscaping(_ character: Character) -> Bool {
@@ -55,7 +38,7 @@ extension StringProtocol {
     private func quoted() -> String { return "\"\(self)\"" }
 }
 
-struct UnescapedCSVTokens<S: StringProtocol>: Sequence {
+struct UnescapedCSVTokens<S: Sequence>: Sequence where S.Element == Character {
     let base: S, separator: Character
     
     enum Token {
@@ -64,103 +47,95 @@ struct UnescapedCSVTokens<S: StringProtocol>: Sequence {
     
     struct Iterator: IteratorProtocol {
         let separator: Character
-        var residual: S.SubSequence, expecting = true
+        var iterator: S.Iterator, isExpecting = true, hasEnded = false
         
-        init(separator: Character, residual: S.SubSequence) {
+        init(separator: Character, iterator: S.Iterator) {
             self.separator = separator
-            self.residual = residual
+            self.iterator = iterator
         }
         
         mutating func next() -> Token? {
-            guard let first = residual.first else {
-                if expecting {
-                    expecting = false
+            guard !hasEnded else {
+                return nil
+            }
+            
+            guard let first = iterator.next() else {
+                if isExpecting {
+                    isExpecting = false
                     return .token("", isLastInLine: true)
                 }
                 return nil
             }
             
-            defer {
-                if !residual.isEmpty {
-                    let removed = residual.removeFirst()
-                    assert(removed == "," || removed.isNewline)
-                    expecting = removed == ","
-                }
-            }
-            
             switch first {
             case "\"":
                 // Escaping
-                var wasEscapeSymbol = false, isValid = true
-                let separatorIndex = residual.dropFirst().firstIndex { current -> Bool in
-                    guard !wasEscapeSymbol else {
-                        wasEscapeSymbol = false
-                        
-                        switch current {
-                        case "\"": // Escaping `"`
-                            return false
-                        case _ where current.isNewline,
-                             separator: // actually end of token
-                            return true
-                        default: // Invalid escaping, just bail out
-                            isValid = false
-                            return true
+                var isEscaping = false, afterQuote: Character?
+                var unescaped: [Character] = []
+                
+                while let current = iterator.next() {
+                    guard !isEscaping else {
+                        if current == "\"" {
+                            isEscaping = false
+                            unescaped.append(current)
+                            continue
                         }
+                        afterQuote = current
+                        break
                     }
                     
-                    wasEscapeSymbol = current == "\""
-                    return false
-                }
-                
-                guard isValid else {
-                    residual = residual.prefix(0)
-                    return .invalid
-                }
-                
-                let endIndex: S.Index
-                if let separatorIndex = separatorIndex {
-                    endIndex = separatorIndex
-                } else if wasEscapeSymbol {
-                    endIndex = residual.endIndex
-                } else {
-                    residual = residual.prefix(0)
-                    return .invalid
-                }
-                
-                let result = residual.prefix(upTo: endIndex)
-                residual = residual.suffix(from: endIndex)
-                return .token(result.unescaped(), isLastInLine: residual.first != separator)
-            case separator,
-                 _ where first.isNewline:
-                return .token("", isLastInLine: residual.first != separator)
-            default:
-                // Non-escaping
-                var isValid = true
-                let result = residual.prefix { current -> Bool in
-                    switch current {
-                    case "\"":
-                        isValid = false
-                        return false
-                    case separator,
-                         _ where current.isNewline:
-                        return false
-                    default: return true
+                    if current == "\"" {
+                        isEscaping = true
+                    } else {
+                        unescaped.append(current)
                     }
                 }
                 
-                if isValid {
-                    residual = residual.suffix(from: result.endIndex)
-                    return .token(String(result),  isLastInLine: residual.first != separator)
-                } else {
-                    residual = residual.prefix(0)
+                guard isEscaping else {
+                    hasEnded = true
                     return .invalid
                 }
+                
+                switch afterQuote {
+                case let x? where x.isNewline:
+                    fallthrough
+                case separator, nil:
+                    isExpecting = afterQuote == separator
+                    return .token(String(unescaped), isLastInLine: afterQuote != separator)
+                default:
+                    hasEnded = true
+                    return .invalid
+                }
+            case separator,
+                 _ where first.isNewline:
+                return .token("", isLastInLine: first != separator)
+            default:
+                // Non-escaping
+                var isSeparator: Bool?, unescaped: [Character] = [first]
+                
+                while let current = iterator.next() {
+                    switch current {
+                    case "\"":
+                        hasEnded = true
+                        return .invalid
+                    case _ where current.isNewline,
+                         separator:
+                        isSeparator = current == separator
+                    default:
+                        unescaped.append(current)
+                        continue
+                    }
+                    break
+                }
+
+                isExpecting = isSeparator == true
+                return .token(String(unescaped), isLastInLine: isSeparator != true)
             }
         }
     }
     
     func makeIterator() -> Iterator {
-        return Iterator(separator: separator, residual: base[...])
+        return Iterator(separator: separator, iterator: base.makeIterator())
     }
 }
 

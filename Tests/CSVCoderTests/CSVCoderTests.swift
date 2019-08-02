@@ -37,6 +37,8 @@ final class CSVCoderTests: XCTestCase {
         }
 
         do {
+            var encoder = CSVEncoder()
+            encoder.options.insert(.alwaysQuote)
             struct Test: Codable, Hashable {
                 var a: Int?, b: Double?, c: Float?, d: String?, e: Bool?
             }
@@ -185,11 +187,50 @@ final class CSVCoderTests: XCTestCase {
             XCTAssertEqual(values, roundtrip)
         }
     }
+    
+    func testTokenizer() {
+        do {
+            let value = """
+            a,l,,
+
+            flf,"llk""d"
+            """
+            let tokens = UnescapedCSVTokens(base: value, separator: ",")
+            var iterator = tokens.makeIterator()
+            guard case .token("a", isLastInLine: false)? = iterator.next() else { XCTFail("Tokenizer 1-1"); return }
+            guard case .token("l", isLastInLine: false)? = iterator.next() else { XCTFail("Tokenizer 1-2"); return }
+            guard case .token("", isLastInLine: false)? = iterator.next() else { XCTFail("Tokenizer 1-3"); return }
+            guard case .token("", isLastInLine: true)? = iterator.next() else { XCTFail("Tokenizer 1-4"); return }
+            
+            guard case .token("", isLastInLine: true)? = iterator.next() else { XCTFail("Tokenizer 1-5"); return }
+            
+            guard case .token("flf", isLastInLine: false)? = iterator.next() else { XCTFail("Tokenizer 1-6"); return }
+            guard case .token("llk\"d", isLastInLine: true)? = iterator.next() else { XCTFail("Tokenizer 1-7"); return }
+            guard nil == iterator.next() else { XCTFail("Tokenizer 1-8"); return }
+            guard nil == iterator.next() else { XCTFail("Tokenizer 1-9"); return }
+            guard nil == iterator.next() else { XCTFail("Tokenizer 1-10"); return }
+        }
+        
+        do {
+            let value = """
+            a,l,alskl",asd\n
+            """
+            let tokens = UnescapedCSVTokens(base: value, separator: ",")
+            var iterator = tokens.makeIterator()
+            guard case .token("a", isLastInLine: false)? = iterator.next() else { XCTFail("Tokenizer 2-1"); return }
+            guard case .token("l", isLastInLine: false)? = iterator.next() else { XCTFail("Tokenizer 2-2"); return }
+            guard case .invalid? = iterator.next() else { XCTFail("Tokenizer 2-3"); return }
+            guard nil == iterator.next() else { XCTFail("Tokenizer 2-4"); return }
+            guard nil == iterator.next() else { XCTFail("Tokenizer 2-5"); return }
+            guard nil == iterator.next() else { XCTFail("Tokenizer 2-6"); return }
+        }
+    }
 
     static var allTests = [
         ("testRoundtrip", testRoundtrip),
         ("testEscaping", testEscaping),
         ("testDecodingFailure", testDecoding),
         ("testNestedContainers", testNestedContainers),
+        ("testTokenizer", testTokenizer)
     ]
 }

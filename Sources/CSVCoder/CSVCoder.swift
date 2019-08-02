@@ -17,13 +17,13 @@ public struct CSVEncoder {
         return path.map { $0.stringValue }.joined(separator: subheaderSeparator)
     }
 
-    func encode<S>(_ values: S) throws -> String where S: Sequence, S.Element: Encodable {
+    public func encode<S>(_ values: S) throws -> String where S: Sequence, S.Element: Encodable {
         var result = ""
         try encode(values, into: &result)
         return result
     }
     
-    func encode<S, Output>(_ values: S, into output: inout Output) throws where S: Sequence, S.Element: Encodable, Output: TextOutputStream {
+    public func encode<S, Output>(_ values: S, into output: inout Output) throws where S: Sequence, S.Element: Encodable, Output: TextOutputStream {
         var fields: [String]?
         let stringSeparator = String(separator)
         
@@ -62,7 +62,7 @@ public struct CSVDecoder {
         self.subheaderSeparator = subheaderSeparator
     }
     
-    func decode<S, T>(_ type: T.Type, _ string: S) throws -> [T] where T: Decodable, S: StringProtocol {
+    public func decode<S, T>(_ type: T.Type, _ string: S) throws -> [T] where T: Decodable, S: StringProtocol {
         let tokens = UnescapedCSVTokens(base: string, separator: separator)
         
         var buffer: [String] = [], headers: Trie?, results: [T] = []

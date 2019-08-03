@@ -6,10 +6,8 @@
 //
 
 struct Trie<Value> {
-    private var children: [String: Trie] = [:]
+    private(set) var children: [String: Trie] = [:]
     private(set) var value: Value?
-    
-    var keys: Dictionary<String, Trie>.Keys { return children.keys }
     
     subscript(key: CodingKey) -> Trie? {
         return children[key.stringValue]
@@ -27,5 +25,14 @@ struct Trie<Value> {
         }
         
         return children[first, default: Trie()].add(value, to: path.dropFirst())
+    }
+
+    func contains(predicate: (Value) throws -> Bool) rethrows -> Bool {
+        if let value = value,
+            try predicate(value) {
+            return true
+        }
+
+        return try children.values.contains { try $0.contains(predicate: predicate) }
     }
 }

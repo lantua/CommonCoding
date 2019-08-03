@@ -6,7 +6,6 @@
 //
 
 extension StringProtocol {
-    /// Return true if the string needs escaping (and is now escaped)
     func escaped(separator: Character, forced: Bool) -> String {
         func needEscaping(_ character: Character) -> Bool {
             guard character != separator,
@@ -27,9 +26,12 @@ extension StringProtocol {
             }
         }
         
-        guard contains(where: needEscaping) else {
-            return forced ? quoted() : String(self)
+        let shouldEscape = forced || contains(where: needEscaping)
+        
+        guard contains("\"") else {
+            return shouldEscape ? quoted() : String(self)
         }
+        assert(shouldEscape)
         
         return String(flatMap { character -> [Character] in
             switch character {
@@ -46,7 +48,16 @@ struct UnescapedCSVTokens<S: Sequence>: Sequence where S.Element == Character {
     let base: S, separator: Character
     
     enum Token {
-        case token(String), rowBoundary, invalid
+        case escaped(String), unescaped(String), rowBoundary, invalid(TokenizationError)
+    }
+    
+    enum TokenizationError: Error {
+        /// Text has unescaped double quote
+        case unescapedQuote
+        /// Text has double quote followed by non-escaping character
+        case invalidEscaping(Character)
+        /// Text has opening double quote, but not closing one
+        case unclosedQoute
     }
     
     /// Sequence of token, and whether or not boundary is
@@ -57,12 +68,14 @@ struct UnescapedCSVTokens<S: Sequence>: Sequence where S.Element == Character {
         
         mutating func next() -> (Token, nextIsSeparator: Bool)? {
             guard let first = iterator.next() else {
+                // This is the only `nil` return. So it would follow `Iterator` convention
+                // of repeating `nil` post-sequence if the base `iterator` follows it.
                 return nil
             }
             
             switch first {
-            case separator: return (.token(""), true)
-            case _ where first.isNewline: return (.token(""), false)
+            case separator: return (.unescaped(""), true)
+            case _ where first.isNewline: return (.unescaped(""), false)
             case "\"":
                 // Escaping
                 var unescaped = "", isEscaping = false
@@ -74,9 +87,9 @@ struct UnescapedCSVTokens<S: Sequence>: Sequence where S.Element == Character {
                             isEscaping = false
                             unescaped.append(current)
                             continue
-                        case separator: return (.token(unescaped), true)
-                        case _ where current.isNewline: return (.token(unescaped), false)
-                        default: return (.invalid, false)
+                        case separator: return (.escaped(unescaped), true)
+                        case _ where current.isNewline: return (.escaped(unescaped), false)
+                        default: return (.invalid(.invalidEscaping(current)), false)
                         }
                     }
                     if current == "\"" {
@@ -86,20 +99,20 @@ struct UnescapedCSVTokens<S: Sequence>: Sequence where S.Element == Character {
                     }
                 }
                 
-                return isEscaping ? (.token(unescaped), false) : (.invalid, false)
+                return isEscaping ? (.escaped(unescaped), false) : (.invalid(.unclosedQoute), false)
             default:
                 // Non-escaping
                 var unescaped = String(first)
                 while let current = iterator.next() {
                     switch current {
-                    case "\"": return (.invalid, false)
-                    case separator: return (.token(unescaped), true)
-                    case _ where current.isNewline: return (.token(unescaped), false)
+                    case "\"": return (.invalid(.unescapedQuote), false)
+                    case separator: return (.unescaped(unescaped), true)
+                    case _ where current.isNewline: return (.unescaped(unescaped), false)
                     default: unescaped.append(current)
                     }
                 }
                 
-                return (.token(unescaped), false)
+                return (.unescaped(unescaped), false)
             }
         }
     }
@@ -125,7 +138,7 @@ struct UnescapedCSVTokens<S: Sequence>: Sequence where S.Element == Character {
                 guard let (token, isSeparator) = iterator.next() else {
                     if state == .expecting {
                         state = .rowBoundary
-                        return .token("")
+                        return .unescaped("")
                     }
                     
                     state = .ended

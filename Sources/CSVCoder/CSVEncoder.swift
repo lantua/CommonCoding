@@ -5,54 +5,58 @@
 //  Created by Natchanon Luangsomboon on 31/7/2562 BE.
 //
 
-import Foundation
-
 public struct CSVEncodingOptions: OptionSet {
     public let rawValue: Int
     public init(rawValue: Int) {
         self.rawValue = rawValue
     }
-    
-    public static let skipHeader        = CSVEncodingOptions(rawValue: 1 << 0)
+
+    /// Don't write header line
+    public static let omitHeader        = CSVEncodingOptions(rawValue: 1 << 0)
+    /// Force escape every value
     public static let alwaysQuote       = CSVEncodingOptions(rawValue: 1 << 1)
-    public static let nonHomogeneous    = CSVEncodingOptions(rawValue: 1 << 2)
+    /// Use unescaped "null" as nil value
+    public static let useNullasNil      = CSVEncodingOptions(rawValue: 1 << 2)
 }
 
 class EncodingContext {
     private let encoder: CSVEncoder, isFixed: Bool
-    private var fieldLocations: [String: Int], values: [String?]
+    private var fieldIndicess: [String: Int], values: [String?]
 
     var userInfo: [CodingUserInfoKey: Any] { return encoder.userInfo }
 
-    init(encoder: CSVEncoder, fieldLocations: [String: Int]? = nil) {
+    init(encoder: CSVEncoder, fieldIndices: [String: Int]? = nil) {
         self.encoder = encoder
-        self.fieldLocations = fieldLocations ?? [:]
+        self.fieldIndicess = fieldIndices ?? [:]
         
-        isFixed = fieldLocations != nil
-        values = Array(repeating: nil, count: (fieldLocations?.count ?? 0))
+        isFixed = fieldIndices != nil
+        values = Array(repeating: nil, count: (fieldIndices?.count ?? 0))
     }
     
     func add(unescaped: String?, to codingPath: [CodingKey]) throws {
-        let escaped = unescaped.map(encoder.escape) ?? ""
+        let escaped = encoder.escape(unescaped)
         if isFixed {
-            guard let index = fieldLocations[encoder.field(for: codingPath)] else {
-                throw EncodingError.invalidValue(escaped, .init(codingPath: codingPath, debugDescription: "Invalid key"))
+            guard let index = fieldIndicess[encoder.field(for: codingPath)] else {
+                guard unescaped != nil else {
+                    return
+                }
+                throw EncodingError.invalidValue(escaped, .init(codingPath: codingPath, debugDescription: "Key does not match any header fields"))
             }
             guard values[index] == nil else {
-                throw EncodingError.invalidValue(escaped, .init(codingPath: codingPath, debugDescription: "Duplicated key"))
+                throw EncodingError.invalidValue(escaped, .init(codingPath: codingPath, debugDescription: "Duplicated header field"))
             }
             
             values[index] = escaped
         } else {
-            guard fieldLocations.updateValue(values.count, forKey: encoder.field(for: codingPath)) == nil else {
-                throw EncodingError.invalidValue(escaped, .init(codingPath: codingPath, debugDescription: "Duplicated key"))
+            guard fieldIndicess.updateValue(values.count, forKey: encoder.field(for: codingPath)) == nil else {
+                throw EncodingError.invalidValue(escaped, .init(codingPath: codingPath, debugDescription: "Duplicated header field"))
             }
             values.append(escaped)
         }
     }
     
-    func finalize() -> (fieldLocations: [String: Int], values: [String]) {
-        return (fieldLocations, values.map { $0 ?? "" })
+    func finalize() -> (fieldIndicess: [String: Int], values: [String]) {
+        return (fieldIndicess, values.map { $0 ?? "" })
     }
 }
 
@@ -66,50 +70,46 @@ struct CSVInternalEncoder: Encoder {
     }
     
     func unkeyedContainer() -> UnkeyedEncodingContainer {
-        return CSVUnkeyedEncodingContainer(context: context, codingPath: codingPath, isSingle: false)
+        return CSVUnkeyedEncodingContainer(context: context, codingPath: codingPath)
     }
     
     func singleValueContainer() -> SingleValueEncodingContainer {
-        return CSVUnkeyedEncodingContainer(context: context, codingPath: codingPath, isSingle: true)
+        return CSVSingleValueEncodingContainer(context: context, codingPath: codingPath)
     }
 }
 
 private struct CSVKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingContainerProtocol {
     let context: EncodingContext, codingPath: [CodingKey]
     
-    private func nextPath(for key: CodingKey) -> [CodingKey] {
+    private func codingPath(for key: CodingKey) -> [CodingKey] {
         return codingPath + [key]
     }
 
-    mutating func encodeNil(forKey key: Key) throws { try encode("", forKey: key) }
-
-    mutating func encode(_ value: String, forKey key: Key) throws {
-        try context.add(unescaped: value, to: nextPath(for: key))
-    }
+    mutating func encodeNil(forKey key: Key) throws { try context.add(unescaped: nil, to: codingPath(for: key)) }
 
     mutating func encode<T>(_ value: T, forKey key: Key) throws where T: Encodable, T: LosslessStringConvertible {
-        try encode(String(value), forKey: key)
+        try context.add(unescaped: String(value), to: codingPath(for: key))
     }
 
     mutating func encode<T>(_ value: T, forKey key: Key) throws where T: Encodable {
-        let encoder = CSVInternalEncoder(context: context, codingPath: nextPath(for: key))
+        let encoder = CSVInternalEncoder(context: context, codingPath: codingPath(for: key))
         try value.encode(to: encoder)
     }
 
     mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> where NestedKey: CodingKey {
-        return KeyedEncodingContainer(CSVKeyedEncodingContainer<NestedKey>(context: context, codingPath: nextPath(for: key)))
+        return KeyedEncodingContainer(CSVKeyedEncodingContainer<NestedKey>(context: context, codingPath: codingPath(for: key)))
     }
     
     mutating func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer {
-        return CSVUnkeyedEncodingContainer(context: context, codingPath: nextPath(for: key), isSingle: false)
+        return CSVUnkeyedEncodingContainer(context: context, codingPath: codingPath(for: key))
     }
     
     mutating func superEncoder() -> Encoder {
-        return CSVInternalEncoder(context: context, codingPath: nextPath(for: SuperCodingKey()))
+        return CSVInternalEncoder(context: context, codingPath: codingPath(for: SuperCodingKey()))
     }
     
     mutating func superEncoder(forKey key: Key) -> Encoder {
-        return CSVInternalEncoder(context: context, codingPath: nextPath(for: key))
+        return CSVInternalEncoder(context: context, codingPath: codingPath(for: key))
     }
 
     mutating func encodeIfPresent(_ value: String?, forKey key: Key) throws {
@@ -120,64 +120,71 @@ private struct CSVKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingContainer
         try encode(value, forKey: key)
     }
 
-    mutating func encodeIfPresent(_ value: Bool?, forKey key: Key) throws { try encode(value.map(String.init(_:)), forKey: key) }
-    mutating func encodeIfPresent(_ value: Double?, forKey key: Key) throws { try encode(value.map(String.init(_:)), forKey: key) }
-    mutating func encodeIfPresent(_ value: Float?, forKey key: Key) throws { try encode(value.map(String.init(_:)), forKey: key) }
-    mutating func encodeIfPresent(_ value: Int?, forKey key: Key) throws { try encode(value.map(String.init(_:)), forKey: key) }
-    mutating func encodeIfPresent(_ value: Int8?, forKey key: Key) throws { try encode(value.map(String.init(_:)), forKey: key) }
-    mutating func encodeIfPresent(_ value: Int16?, forKey key: Key) throws { try encode(value.map(String.init(_:)), forKey: key) }
-    mutating func encodeIfPresent(_ value: Int32?, forKey key: Key) throws { try encode(value.map(String.init(_:)), forKey: key) }
-    mutating func encodeIfPresent(_ value: Int64?, forKey key: Key) throws { try encode(value.map(String.init(_:)), forKey: key) }
-    mutating func encodeIfPresent(_ value: UInt?, forKey key: Key) throws { try encode(value.map(String.init), forKey: key) }
-    mutating func encodeIfPresent(_ value: UInt8?, forKey key: Key) throws { try encode(value.map(String.init), forKey: key) }
-    mutating func encodeIfPresent(_ value: UInt16?, forKey key: Key) throws { try encode(value.map(String.init), forKey: key) }
-    mutating func encodeIfPresent(_ value: UInt32?, forKey key: Key) throws { try encode(value.map(String.init), forKey: key) }
-    mutating func encodeIfPresent(_ value: UInt64?, forKey key: Key) throws { try encode(value.map(String.init), forKey: key) }
+    mutating func encodeIfPresent(_ value: Bool?, forKey key: Key) throws { try encodeIfPresent(value.map(String.init(_:)), forKey: key) }
+    mutating func encodeIfPresent(_ value: Double?, forKey key: Key) throws { try encodeIfPresent(value.map(String.init(_:)), forKey: key) }
+    mutating func encodeIfPresent(_ value: Float?, forKey key: Key) throws { try encodeIfPresent(value.map(String.init(_:)), forKey: key) }
+    mutating func encodeIfPresent(_ value: Int?, forKey key: Key) throws { try encodeIfPresent(value.map(String.init(_:)), forKey: key) }
+    mutating func encodeIfPresent(_ value: Int8?, forKey key: Key) throws { try encodeIfPresent(value.map(String.init(_:)), forKey: key) }
+    mutating func encodeIfPresent(_ value: Int16?, forKey key: Key) throws { try encodeIfPresent(value.map(String.init(_:)), forKey: key) }
+    mutating func encodeIfPresent(_ value: Int32?, forKey key: Key) throws { try encodeIfPresent(value.map(String.init(_:)), forKey: key) }
+    mutating func encodeIfPresent(_ value: Int64?, forKey key: Key) throws { try encodeIfPresent(value.map(String.init(_:)), forKey: key) }
+    mutating func encodeIfPresent(_ value: UInt?, forKey key: Key) throws { try encodeIfPresent(value.map(String.init), forKey: key) }
+    mutating func encodeIfPresent(_ value: UInt8?, forKey key: Key) throws { try encodeIfPresent(value.map(String.init), forKey: key) }
+    mutating func encodeIfPresent(_ value: UInt16?, forKey key: Key) throws { try encodeIfPresent(value.map(String.init), forKey: key) }
+    mutating func encodeIfPresent(_ value: UInt32?, forKey key: Key) throws { try encodeIfPresent(value.map(String.init), forKey: key) }
+    mutating func encodeIfPresent(_ value: UInt64?, forKey key: Key) throws { try encodeIfPresent(value.map(String.init), forKey: key) }
 }
 
-private struct CSVUnkeyedEncodingContainer: UnkeyedEncodingContainer, SingleValueEncodingContainer {
-    let context: EncodingContext, codingPath: [CodingKey], isSingle: Bool
+private struct CSVUnkeyedEncodingContainer: UnkeyedEncodingContainer {
+    let context: EncodingContext, codingPath: [CodingKey]
     var count = 0
     
-    init(context: EncodingContext, codingPath: [CodingKey], isSingle: Bool) {
+    init(context: EncodingContext, codingPath: [CodingKey]) {
         self.context = context
         self.codingPath = codingPath
-        self.isSingle = isSingle
     }
     
-    private mutating func nextPath() -> [CodingKey] {
-        if isSingle {
-            precondition(count == 0)
-            count += 1
-            return codingPath
-        } else {
-            let key = UnkeyedCodingKey(intValue: count)
-            count += 1
-            return codingPath + [key]
-        }
+    private mutating func consumeCodingPath() -> [CodingKey] {
+        let key = UnkeyedCodingKey(intValue: count)
+        count += 1
+        return codingPath + [key]
     }
     
-    mutating func encodeNil() throws { try context.add(unescaped: nil, to: nextPath()) }
-    mutating func encode(_ value: String) throws { try context.add(unescaped: value, to: nextPath()) }
+    mutating func encodeNil() throws { try context.add(unescaped: nil, to: consumeCodingPath()) }
 
     mutating func encode<T>(_ value: T) throws where T: Encodable, T: LosslessStringConvertible {
-        try encode(String(value))
+        try context.add(unescaped: String(value), to: consumeCodingPath())
     }
 
     mutating func encode<T>(_ value: T) throws where T: Encodable {
-        let encoder = CSVInternalEncoder(context: context, codingPath: nextPath())
-        try value.encode(to: encoder)
+        try value.encode(to: CSVInternalEncoder(context: context, codingPath: consumeCodingPath()))
     }
     
     mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> where NestedKey: CodingKey {
-        return KeyedEncodingContainer(CSVKeyedEncodingContainer(context: context, codingPath: nextPath()))
+        return KeyedEncodingContainer(CSVKeyedEncodingContainer(context: context, codingPath: consumeCodingPath()))
     }
     
     mutating func nestedUnkeyedContainer() -> UnkeyedEncodingContainer {
-        return CSVUnkeyedEncodingContainer(context: context, codingPath: nextPath(), isSingle: isSingle)
+        return CSVUnkeyedEncodingContainer(context: context, codingPath: consumeCodingPath())
     }
     
     mutating func superEncoder() -> Encoder {
-        return CSVInternalEncoder(context: context, codingPath: nextPath())
+        return CSVInternalEncoder(context: context, codingPath: consumeCodingPath())
+    }
+}
+
+private struct CSVSingleValueEncodingContainer: SingleValueEncodingContainer {
+    let context: EncodingContext, codingPath: [CodingKey]
+
+    mutating func encodeNil() throws {
+        try context.add(unescaped: nil, to: codingPath)
+    }
+
+    mutating func encode<T>(_ value: T) throws where T : Encodable, T: LosslessStringConvertible {
+        try context.add(unescaped: String(value), to: codingPath)
+    }
+
+    mutating func encode<T>(_ value: T) throws where T : Encodable {
+        try value.encode(to: CSVInternalEncoder(context: context, codingPath: codingPath))
     }
 }

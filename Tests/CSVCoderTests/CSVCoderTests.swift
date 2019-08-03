@@ -97,6 +97,7 @@ final class CSVCoderTests: XCTestCase {
         }
         
         XCTAssertThrowsError(try decoder.decode(Double.self, from: "a, kjskdj,a\n9949,9494,4"))
+        XCTAssertThrowsError(try decoder.decode(Bool.self, from: "\ntrue\n,"))
         
         XCTAssertEqual(try decoder.decode(String.self, from: "\nasjdkjfksadf"), ["asjdkjfksadf"])
         XCTAssertEqual(try decoder.decode(Int.self, from: "\n7737"), [7737])
@@ -197,15 +198,19 @@ final class CSVCoderTests: XCTestCase {
             """
             let tokens = UnescapedCSVTokens(base: value, separator: ",")
             var iterator = tokens.makeIterator()
-            guard case .token("a", isLastInLine: false)? = iterator.next() else { XCTFail("Tokenizer 1-1"); return }
-            guard case .token("l", isLastInLine: false)? = iterator.next() else { XCTFail("Tokenizer 1-2"); return }
-            guard case .token("", isLastInLine: false)? = iterator.next() else { XCTFail("Tokenizer 1-3"); return }
-            guard case .token("", isLastInLine: true)? = iterator.next() else { XCTFail("Tokenizer 1-4"); return }
+            guard case .token("a")? = iterator.next() else { XCTFail("Tokenizer 1-1"); return }
+            guard case .token("l")? = iterator.next() else { XCTFail("Tokenizer 1-2"); return }
+            guard case .token("")? = iterator.next() else { XCTFail("Tokenizer 1-3"); return }
+            guard case .token("")? = iterator.next() else { XCTFail("Tokenizer 1-4"); return }
+            guard case .rowBoundary? = iterator.next() else { XCTFail("Tokenizer 1-4l"); return }
             
-            guard case .token("", isLastInLine: true)? = iterator.next() else { XCTFail("Tokenizer 1-5"); return }
+            guard case .token("")? = iterator.next() else { XCTFail("Tokenizer 1-5"); return }
+            guard case .rowBoundary? = iterator.next() else { XCTFail("Tokenizer 1-5l"); return }
+
+            guard case .token("flf")? = iterator.next() else { XCTFail("Tokenizer 1-6"); return }
+            guard case .token("llk\"d")? = iterator.next() else { XCTFail("Tokenizer 1-7"); return }
+            guard case .rowBoundary? = iterator.next() else { XCTFail("Tokenizer 1-7l"); return }
             
-            guard case .token("flf", isLastInLine: false)? = iterator.next() else { XCTFail("Tokenizer 1-6"); return }
-            guard case .token("llk\"d", isLastInLine: true)? = iterator.next() else { XCTFail("Tokenizer 1-7"); return }
             guard nil == iterator.next() else { XCTFail("Tokenizer 1-8"); return }
             guard nil == iterator.next() else { XCTFail("Tokenizer 1-9"); return }
             guard nil == iterator.next() else { XCTFail("Tokenizer 1-10"); return }
@@ -217,8 +222,8 @@ final class CSVCoderTests: XCTestCase {
             """
             let tokens = UnescapedCSVTokens(base: value, separator: ",")
             var iterator = tokens.makeIterator()
-            guard case .token("a", isLastInLine: false)? = iterator.next() else { XCTFail("Tokenizer 2-1"); return }
-            guard case .token("l", isLastInLine: false)? = iterator.next() else { XCTFail("Tokenizer 2-2"); return }
+            guard case .token("a")? = iterator.next() else { XCTFail("Tokenizer 2-1"); return }
+            guard case .token("l")? = iterator.next() else { XCTFail("Tokenizer 2-2"); return }
             guard case .invalid? = iterator.next() else { XCTFail("Tokenizer 2-3"); return }
             guard nil == iterator.next() else { XCTFail("Tokenizer 2-4"); return }
             guard nil == iterator.next() else { XCTFail("Tokenizer 2-5"); return }

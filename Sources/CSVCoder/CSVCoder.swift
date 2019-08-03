@@ -61,12 +61,9 @@ public struct CSVDecoder {
         var buffer: [String] = [], fields: Trie<Int>?, fieldCount: Int!, results: [T] = []
         for token in UnescapedCSVTokens(base: string, separator: separator) {
             switch token {
-            case .invalid:
-                throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Invalid CSV format"))
-            case let .token(subsequence, isLastInLine: false):
-                buffer.append(subsequence)
-            case let .token(subsequence, isLastInLine: true):
-                buffer.append(subsequence)
+            case let .token(string): buffer.append(string)
+            case .invalid: throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Invalid CSV format"))
+            case .rowBoundary:
                 defer { buffer.removeAll(keepingCapacity: true) }
                 
                 guard let currentHeaders = fields else {

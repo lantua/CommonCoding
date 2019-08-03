@@ -10,6 +10,7 @@ extension StringProtocol {
     func escaped(separator: Character, forced: Bool) -> String {
         func needEscaping(_ character: Character) -> Bool {
             guard character != separator,
+                !character.isNewline,
                 let asciiValue = character.asciiValue else {
                     return true
             }
@@ -19,7 +20,10 @@ extension StringProtocol {
                 return true
             case 0x20...0x7E: // Printable ASCII
                 return false
-            default: return true
+            default:
+                // non-printable characters
+                // Not sure how escaping would help, but well, we tried...
+                return true
             }
         }
         
@@ -42,48 +46,39 @@ struct UnescapedCSVTokens<S: Sequence>: Sequence where S.Element == Character {
     let base: S, separator: Character
     
     enum Token {
-        case token(String, isLastInLine: Bool), invalid
+        case token(String), rowBoundary, invalid
     }
     
-    struct Iterator: IteratorProtocol {
+    /// Sequence of token, and whether or not boundary is
+    /// - Attention: Do NOT call `next` after it returns (.invalid, _)
+    private struct StatelessIterator: IteratorProtocol {
         let separator: Character
-        var iterator: S.Iterator, isExpecting = true, hasEnded = false
+        var iterator: S.Iterator
         
-        init(separator: Character, iterator: S.Iterator) {
-            self.separator = separator
-            self.iterator = iterator
-        }
-        
-        mutating func next() -> Token? {
-            guard !hasEnded else {
-                return nil
-            }
-            
+        mutating func next() -> (Token, nextIsSeparator: Bool)? {
             guard let first = iterator.next() else {
-                if isExpecting {
-                    isExpecting = false
-                    return .token("", isLastInLine: true)
-                }
                 return nil
             }
             
             switch first {
+            case separator: return (.token(""), true)
+            case _ where first.isNewline: return (.token(""), false)
             case "\"":
                 // Escaping
-                var isEscaping = false, afterQuote: Character?
-                var unescaped: [Character] = []
+                var unescaped = "", isEscaping = false
                 
                 while let current = iterator.next() {
                     guard !isEscaping else {
-                        if current == "\"" {
+                        switch current {
+                        case "\"":
                             isEscaping = false
                             unescaped.append(current)
                             continue
+                        case separator: return (.token(unescaped), true)
+                        case _ where current.isNewline: return (.token(unescaped), false)
+                        default: return (.invalid, false)
                         }
-                        afterQuote = current
-                        break
                     }
-                    
                     if current == "\"" {
                         isEscaping = true
                     } else {
@@ -91,45 +86,61 @@ struct UnescapedCSVTokens<S: Sequence>: Sequence where S.Element == Character {
                     }
                 }
                 
-                guard isEscaping else {
-                    hasEnded = true
-                    return .invalid
-                }
-                
-                switch afterQuote {
-                case let x? where x.isNewline:
-                    fallthrough
-                case separator, nil:
-                    isExpecting = afterQuote == separator
-                    return .token(String(unescaped), isLastInLine: afterQuote != separator)
-                default:
-                    hasEnded = true
-                    return .invalid
-                }
-            case separator,
-                 _ where first.isNewline:
-                return .token("", isLastInLine: first != separator)
+                return isEscaping ? (.token(unescaped), false) : (.invalid, false)
             default:
                 // Non-escaping
-                var isSeparator: Bool?, unescaped: [Character] = [first]
-                
+                var unescaped = String(first)
                 while let current = iterator.next() {
                     switch current {
-                    case "\"":
-                        hasEnded = true
-                        return .invalid
-                    case _ where current.isNewline,
-                         separator:
-                        isSeparator = current == separator
-                    default:
-                        unescaped.append(current)
-                        continue
+                    case "\"": return (.invalid, false)
+                    case separator: return (.token(unescaped), true)
+                    case _ where current.isNewline: return (.token(unescaped), false)
+                    default: unescaped.append(current)
                     }
-                    break
                 }
+                
+                return (.token(unescaped), false)
+            }
+        }
+    }
+    
+    struct Iterator: IteratorProtocol {
+        private enum State {
+            case expecting, nonexpecting, rowBoundary, ended
+        }
 
-                isExpecting = isSeparator == true
-                return .token(String(unescaped), isLastInLine: isSeparator != true)
+        private var iterator: StatelessIterator, state = State.expecting
+        
+        init(separator: Character, iterator: S.Iterator) {
+            self.iterator = StatelessIterator(separator: separator, iterator: iterator)
+        }
+        
+        mutating func next() -> Token? {
+            switch state {
+            case .ended: return nil
+            case.rowBoundary:
+                state = .nonexpecting
+                return .rowBoundary
+            case .expecting, .nonexpecting:
+                guard let (token, isSeparator) = iterator.next() else {
+                    if state == .expecting {
+                        state = .rowBoundary
+                        return .token("")
+                    }
+                    
+                    state = .ended
+                    return nil
+                }
+                
+                if case .invalid = token {
+                    state = .ended
+                } else if isSeparator {
+                    state = .expecting
+                } else {
+                    state = .rowBoundary
+                }
+                
+                return token
             }
         }
     }

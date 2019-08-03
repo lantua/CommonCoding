@@ -9,12 +9,11 @@ import Foundation
 
 class DecodingContext {
     private let decoder: CSVDecoder
-    
     var userInfo: [CodingUserInfoKey: Any] { return decoder.userInfo }
     
     private let data: [String]
 
-    init(decoder: CSVDecoder, data: [String]) throws {
+    init(decoder: CSVDecoder, data: [String]) {
         self.decoder = decoder
         self.data = data
     }
@@ -241,4 +240,3 @@ private struct CSVSingleValueDecodingContainer: SingleValueDecodingContainer {
         return CSVInternalDecoder(context: context, headers: headers, codingPath: codingPath)
     }
 }
-

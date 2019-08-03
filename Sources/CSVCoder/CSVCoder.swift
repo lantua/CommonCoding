@@ -65,21 +65,24 @@ public struct CSVDecoder {
     public func decode<S, T>(_ type: T.Type, _ string: S) throws -> [T] where T: Decodable, S: Sequence, S.Element == Character {
         let tokens = UnescapedCSVTokens(base: string, separator: separator)
         
-        var buffer: [String] = [], headers: Trie?, results: [T] = []
+        var buffer: [String] = [], fields: Trie?, fieldCount: Int!, results: [T] = []
         for token in tokens {
             switch token {
+            case .invalid:
+                throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Invalid CSV format"))
             case let .token(subsequence, isLastInLine: false):
                 buffer.append(subsequence)
             case let .token(subsequence, isLastInLine: true):
                 buffer.append(subsequence)
                 defer { buffer.removeAll(keepingCapacity: true) }
                 
-                guard let currentHeaders = headers else {
-                    headers = Trie()
+                guard let currentHeaders = fields else {
+                    fields = Trie()
+                    fieldCount = buffer.count
                     for (offset, field) in buffer.enumerated() {
                         let path = field.split(separator: subheaderSeparator).map(String.init)
-                        guard headers!.add(offset, to: path) else {
-                            throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Duplicated key \(field)"))
+                        guard fields!.add(offset, to: path) else {
+                            throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Duplicated field \(field)"))
                         }
                     }
                     continue
@@ -90,11 +93,13 @@ public struct CSVDecoder {
                     continue
                 }
                 
-                let context = try DecodingContext(decoder: self, data: buffer)
+                guard buffer.count == fieldCount else {
+                    throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Each row must have equal number of fields"))
+                }
+                
+                let context = DecodingContext(decoder: self, data: buffer)
                 let decoder = CSVInternalDecoder(context: context, headers: currentHeaders, codingPath: [])
                 try results.append(T(from: decoder))
-            case .invalid:
-                throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Invalid CSV format"))
             }
         }
        
@@ -102,4 +107,3 @@ public struct CSVDecoder {
         return results
     }
 }
-

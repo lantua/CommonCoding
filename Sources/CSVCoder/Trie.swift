@@ -5,9 +5,9 @@
 //  Created by Natchanon Luangsomboon on 1/8/2562 BE.
 //
 
-struct Trie {
+struct Trie<Value> {
     private var children: [String: Trie] = [:]
-    private(set) var value: Int?
+    private(set) var value: Value?
     
     var keys: Dictionary<String, Trie>.Keys { return children.keys }
     
@@ -15,17 +15,15 @@ struct Trie {
         return children[key.stringValue]
     }
     
-    mutating func add(_ value: Int, to path: [String]) -> Bool {
+    mutating func add(_ value: Value, to path: [String]) -> Value? {
         return add(value, to: path[...])
     }
     
-    private mutating func add(_ value: Int, to path: ArraySlice<String>) -> Bool {
+    private mutating func add(_ value: Value, to path: ArraySlice<String>) -> Value? {
         guard let first = path.first else {
-            guard self.value == nil else {
-                return false
-            }
+            let oldValue = self.value
             self.value = value
-            return true
+            return oldValue
         }
         
         return children[first, default: Trie()].add(value, to: path.dropFirst())

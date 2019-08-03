@@ -24,27 +24,22 @@ public struct CSVEncoder {
     }
     
     public func encode<S, Output>(_ values: S, into output: inout Output) throws where S: Sequence, S.Element: Encodable, Output: TextOutputStream {
-        var fields: [String]?
         let stringSeparator = String(separator)
+        var fieldLocations: [String: Int]?
         
         for value in values {
-            let context: EncodingContext
-            if !options.contains(.nonHomogeneous),
-                let fields = fields {
-                context = try ConstrainedEncodingContext(encoder: self, fields: fields)
-            } else {
-                context = UnconstraintedEncodingContext(encoder: self)
-            }
-            
+            let context = EncodingContext(encoder: self, fieldLocations: options.contains(.nonHomogeneous) ? nil : fieldLocations)
             let encoder = CSVInternalEncoder(context: context, codingPath: [])
             try value.encode(to: encoder)
             
-            let (newFields, entry) = context.finalize()
+            let (newFieldLocations, entry) = context.finalize()
             
-            if fields == nil {
-                fields = newFields
+            if fieldLocations == nil {
+                fieldLocations = newFieldLocations
                 if !options.contains(.skipHeader) {
-                    print(newFields.joined(separator: stringSeparator), to: &output)
+                    let fields = newFieldLocations.sorted { $0.value < $1.value }
+                    assert(fields.map { $0.value } == Array(0..<fields.count))
+                    print(fields.map { $0.key }.joined(separator: stringSeparator), to: &output)
                 }
             }
             print(entry.joined(separator: stringSeparator), to: &output)
@@ -62,11 +57,9 @@ public struct CSVDecoder {
         self.subheaderSeparator = subheaderSeparator
     }
     
-    public func decode<S, T>(_ type: T.Type, _ string: S) throws -> [T] where T: Decodable, S: Sequence, S.Element == Character {
-        let tokens = UnescapedCSVTokens(base: string, separator: separator)
-        
-        var buffer: [String] = [], fields: Trie?, fieldCount: Int!, results: [T] = []
-        for token in tokens {
+    public func decode<S, T>(_ type: T.Type, from string: S) throws -> [T] where S: Sequence, S.Element == Character, T: Decodable {
+        var buffer: [String] = [], fields: Trie<Int>?, fieldCount: Int!, results: [T] = []
+        for token in UnescapedCSVTokens(base: string, separator: separator) {
             switch token {
             case .invalid:
                 throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Invalid CSV format"))
@@ -81,7 +74,7 @@ public struct CSVDecoder {
                     fieldCount = buffer.count
                     for (offset, field) in buffer.enumerated() {
                         let path = field.split(separator: subheaderSeparator).map(String.init)
-                        guard fields!.add(offset, to: path) else {
+                        guard fields!.add(offset, to: path) == nil else {
                             throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Duplicated field \(field)"))
                         }
                     }

@@ -24,10 +24,10 @@ class DecodingContext {
 }
 
 struct CSVInternalDecoder: Decoder {
-    let context: DecodingContext, codingPath: [CodingKey], headers: Trie
+    let context: DecodingContext, headers: Trie<Int>, codingPath: [CodingKey]
     var userInfo: [CodingUserInfoKey: Any] { return context.userInfo }
     
-    init(context: DecodingContext, headers: Trie, codingPath: [CodingKey]) {
+    init(context: DecodingContext, headers: Trie<Int>, codingPath: [CodingKey]) {
         self.context = context
         self.headers = headers
         self.codingPath = codingPath
@@ -38,7 +38,7 @@ struct CSVInternalDecoder: Decoder {
     }
     
     func unkeyedContainer() throws -> UnkeyedDecodingContainer {
-        return try CSVUnkeyedDecodingContainer(context: context, headers: headers, codingPath: codingPath)
+        return CSVUnkeyedDecodingContainer(context: context, headers: headers, codingPath: codingPath)
     }
     
     func singleValueContainer() throws -> SingleValueDecodingContainer {
@@ -47,39 +47,37 @@ struct CSVInternalDecoder: Decoder {
 }
 
 private struct CSVKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainerProtocol {
-    let context: DecodingContext, headers: Trie, codingPath: [CodingKey]
-    let allKeys: [Key], allUniqueKeys: Set<String>
+    let context: DecodingContext, headers: Trie<Int>, codingPath: [CodingKey]
+    let allKeys: [Key]
     
-    init(context: DecodingContext, headers: Trie, codingPath: [CodingKey]) {
+    init(context: DecodingContext, headers: Trie<Int>, codingPath: [CodingKey]) {
         self.context = context
         self.headers = headers
         self.codingPath = codingPath
     
         allKeys = headers.keys.compactMap { Key(stringValue: String($0)) }
-        allUniqueKeys = Set(allKeys.map { $0.stringValue })
     }
     
-    private func nextPath(for key: CodingKey) -> [CodingKey] {
+    private func path(for key: CodingKey) -> [CodingKey] {
         return codingPath + [key]
     }
     
-    private func header(for key: CodingKey) throws -> Trie {
+    private func header(for key: CodingKey) throws -> Trie<Int> {
         guard let header = headers[key] else {
-            throw DecodingError.keyNotFound(key, .init(codingPath: codingPath, debugDescription: "Key not found"))
+            throw DecodingError.keyNotFound(key, .init(codingPath: codingPath, debugDescription: ""))
         }
         return header
     }
     
-    func contains(_ key: Key) -> Bool { return allUniqueKeys.contains(key.stringValue) }
+    func contains(_ key: Key) -> Bool { return headers[key] != nil }
     
     func decodeNil(forKey key: Key) throws -> Bool {
-        let string = try decode(String.self, forKey: key)
-        return string.isEmpty
+        return try decode(String.self, forKey: key).isEmpty
     }
     
     func decode(_ type: String.Type, forKey key: Key) throws -> String {
         guard let index = headers[key]?.value else {
-            throw DecodingError.keyNotFound(key, .init(codingPath: codingPath, debugDescription: "Key not found"))
+            throw DecodingError.keyNotFound(key, .init(codingPath: codingPath, debugDescription: ""))
         }
         return context.value(at: index)
     }
@@ -87,41 +85,40 @@ private struct CSVKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainer
     func decode<T>(_ type: T.Type, forKey key: Key) throws -> T where T: Decodable, T: LosslessStringConvertible {
         let string = try decode(String.self, forKey: key)
         guard let result = T(string) else {
-            throw DecodingError.typeMismatch(T.self, .init(codingPath: nextPath(for: key), debugDescription: ""))
+            throw DecodingError.typeMismatch(T.self, .init(codingPath: path(for: key), debugDescription: ""))
         }
         return result
     }
     
     func decode<T>(_ type: T.Type, forKey key: Key) throws -> T where T: Decodable {
-        let decoder = try CSVInternalDecoder(context: context, headers: header(for: key), codingPath: nextPath(for: key))
-        return try T(from: decoder)
+        return try T(from: CSVInternalDecoder(context: context, headers: header(for: key), codingPath: path(for: key)))
     }
     
     func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type, forKey key: Key) throws -> KeyedDecodingContainer<NestedKey> where NestedKey: CodingKey {
-        return try .init(CSVKeyedDecodingContainer<NestedKey>(context: context, headers: header(for: key), codingPath: nextPath(for: key)))
+        return try .init(CSVKeyedDecodingContainer<NestedKey>(context: context, headers: header(for: key), codingPath: path(for: key)))
     }
     
     func nestedUnkeyedContainer(forKey key: Key) throws -> UnkeyedDecodingContainer {
-        return try CSVUnkeyedDecodingContainer(context: context, headers: header(for: key), codingPath: nextPath(for: key))
+        return try CSVUnkeyedDecodingContainer(context: context, headers: header(for: key), codingPath: path(for: key))
     }
     
     func superDecoder() throws -> Decoder {
-        return try CSVInternalDecoder(context: context, headers: header(for: SuperCodingKey()), codingPath: nextPath(for: SuperCodingKey()))
+        return try CSVInternalDecoder(context: context, headers: header(for: SuperCodingKey()), codingPath: path(for: SuperCodingKey()))
     }
     
     func superDecoder(forKey key: Key) throws -> Decoder {
-        return try CSVInternalDecoder(context: context, headers: header(for: key), codingPath: nextPath(for: key))
+        return try CSVInternalDecoder(context: context, headers: header(for: key), codingPath: path(for: key))
     }
 }
 
 private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
-    let context: DecodingContext, headers: Trie, codingPath: [CodingKey]
+    let context: DecodingContext, headers: Trie<Int>, codingPath: [CodingKey]
     
     let count: Int?
     var currentIndex = 0
     var isAtEnd: Bool { return currentIndex == count }
     
-    init(context: DecodingContext, headers: Trie, codingPath: [CodingKey]) throws {
+    init(context: DecodingContext, headers: Trie<Int>, codingPath: [CodingKey]) {
         self.context = context
         self.headers = headers
         self.codingPath = codingPath
@@ -139,10 +136,10 @@ private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
         self.count = count
     }
 
-    private mutating func nextHeader() throws -> Trie {
+    private mutating func nextHeader() throws -> Trie<Int> {
         let key = currentKey()
         guard let result = headers[key] else {
-            throw DecodingError.keyNotFound(key, .init(codingPath: codingPath, debugDescription: "Key not found"))
+            throw DecodingError.keyNotFound(key, .init(codingPath: codingPath, debugDescription: ""))
         }
         currentIndex += 1
         return result
@@ -165,7 +162,7 @@ private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     
     mutating func decode(_ type: String.Type) throws -> String {
         guard let index = try nextHeader().value else {
-            throw DecodingError.keyNotFound(currentKey(), .init(codingPath: codingPath, debugDescription: "Key not found"))
+            throw DecodingError.keyNotFound(currentKey(), .init(codingPath: codingPath, debugDescription: ""))
         }
         return context.value(at: index)
     }
@@ -173,15 +170,14 @@ private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     mutating func decode<T>(_ type: T.Type) throws -> T where T: Decodable, T: LosslessStringConvertible {
         let string = try decode(String.self)
         guard let result = T(string) else {
-            throw DecodingError.typeMismatch(Double.self, .init(codingPath: currentPath(), debugDescription: ""))
+            throw DecodingError.typeMismatch(T.self, .init(codingPath: currentPath(), debugDescription: ""))
         }
         return result
     }
     
     mutating func decode<T>(_ type: T.Type) throws -> T where T: Decodable {
         let header = try nextHeader()
-        let decoder = CSVInternalDecoder(context: context, headers: header, codingPath: currentPath())
-        return try T(from: decoder)
+        return try T(from: CSVInternalDecoder(context: context, headers: header, codingPath: currentPath()))
     }
     
     mutating func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type) throws -> KeyedDecodingContainer<NestedKey> where NestedKey: CodingKey {
@@ -191,7 +187,7 @@ private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     
     mutating func nestedUnkeyedContainer() throws -> UnkeyedDecodingContainer {
         let header = try nextHeader()
-        return try CSVUnkeyedDecodingContainer(context: context, headers: header, codingPath: currentPath())
+        return CSVUnkeyedDecodingContainer(context: context, headers: header, codingPath: currentPath())
     }
     
     mutating func superDecoder() throws -> Decoder {
@@ -201,7 +197,7 @@ private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
 }
 
 private struct CSVSingleValueDecodingContainer: SingleValueDecodingContainer {
-    let context: DecodingContext, headers: Trie, codingPath: [CodingKey]
+    let context: DecodingContext, headers: Trie<Int>, codingPath: [CodingKey]
     
     func decodeNil() -> Bool {
         let isNil = try? decode(String.self).isEmpty
@@ -210,7 +206,7 @@ private struct CSVSingleValueDecodingContainer: SingleValueDecodingContainer {
     
     func decode(_ type: String.Type) throws -> String {
         guard let index = headers.value else {
-            throw DecodingError.keyNotFound(codingPath.last ?? UnkeyedCodingKey(intValue: 0), .init(codingPath: codingPath.dropLast(), debugDescription: "Key not found"))
+            throw DecodingError.keyNotFound(codingPath.last ?? UnkeyedCodingKey(intValue: 0), .init(codingPath: codingPath.dropLast(), debugDescription: ""))
         }
         return context.value(at: index)
     }
@@ -218,14 +214,13 @@ private struct CSVSingleValueDecodingContainer: SingleValueDecodingContainer {
     func decode<T>(_ type: T.Type) throws -> T where T: Decodable, T: LosslessStringConvertible {
         let string = try decode(String.self)
         guard let result = T(string) else {
-            throw DecodingError.typeMismatch(Double.self, .init(codingPath: codingPath, debugDescription: ""))
+            throw DecodingError.typeMismatch(T.self, .init(codingPath: codingPath, debugDescription: ""))
         }
         return result
     }
     
     func decode<T>(_ type: T.Type) throws -> T where T: Decodable {
-        let decoder = CSVInternalDecoder(context: context, headers: headers, codingPath: codingPath)
-        return try T(from: decoder)
+        return try T(from: CSVInternalDecoder(context: context, headers: headers, codingPath: codingPath))
     }
     
     mutating func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type) throws -> KeyedDecodingContainer<NestedKey> where NestedKey: CodingKey {
@@ -233,7 +228,7 @@ private struct CSVSingleValueDecodingContainer: SingleValueDecodingContainer {
     }
     
     mutating func nestedUnkeyedContainer() throws -> UnkeyedDecodingContainer {
-        return try CSVUnkeyedDecodingContainer(context: context, headers: headers, codingPath: codingPath)
+        return CSVUnkeyedDecodingContainer(context: context, headers: headers, codingPath: codingPath)
     }
     
     mutating func superDecoder() throws -> Decoder {

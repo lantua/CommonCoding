@@ -108,15 +108,74 @@ final class CSVCoderTests: XCTestCase {
         }
     }
 
-    func testRoundtrip() {
+    func testCodingKeys() {
         do {
-            let values: Int? = nil
-            let decoder = CSVDecoder(options: .treatNullAsNil)
-            let encoder = CSVEncoder(options: .useNullasNil)
-            try XCTAssertEqual(decoder.decode(Int?.self, from: encoder.encode([values])), [values])
+            let key1: CodingKey = UnkeyedCodingKey(intValue: 9988)
+            XCTAssertEqual(key1.intValue, 9988)
+            XCTAssertEqual(key1.stringValue, "9988")
+
+            let key2: CodingKey? = UnkeyedCodingKey(stringValue: "someValue")
+            XCTAssertNil(key2)
+
+            let key3: CodingKey? = UnkeyedCodingKey(stringValue: "1234")
+            XCTAssertEqual(key3?.intValue, 1234)
+            XCTAssertEqual(key3?.stringValue, "1234")
+        }
+
+        do {
+            let key1: CodingKey? = SuperCodingKey(intValue: 1)
+            XCTAssertNil(key1)
+
+            let key2: CodingKey? = SuperCodingKey(intValue: 0)
+            XCTAssertEqual(key2?.intValue, 0)
+            XCTAssertEqual(key2?.stringValue, "super")
+
+            let key3: CodingKey? = SuperCodingKey(stringValue: "super")
+            XCTAssertEqual(key3?.intValue, 0)
+            XCTAssertEqual(key3?.stringValue, "super")
+
+            let key4: CodingKey? = SuperCodingKey(stringValue: "Something else")
+            XCTAssertNil(key4)
         }
     }
 
+    func testRoundtrip() {
+        do {
+            let values: Int? = nil
+            let encoder = CSVEncoder(options: .useNullasNil)
+            let decoder = CSVDecoder(options: .treatNullAsNil)
+            try XCTAssertEqual(decoder.decode(Int?.self, from: encoder.encode([values])), [values])
+        }
+        do {
+            let value = "null"
+            let encoder = CSVEncoder(options: .useNullasNil)
+            let decoder = CSVDecoder(options: .treatNullAsNil)
+            try XCTAssertEqual(decoder.decode(String?.self, from: encoder.encode([value])), [value])
+        }
+        do {
+            struct Test: Codable, Equatable {
+                var value: String
+
+                init(_ value: String) {
+                    self.value = value
+                }
+
+                init(from decoder: Decoder) throws {
+                    XCTAssertEqual(decoder.userInfo[CodingUserInfoKey(rawValue: "decodingKey")!] as? String, "decodingValue")
+                    value = try String(from: decoder)
+                }
+
+                func encode(to encoder: Encoder) throws {
+                    XCTAssertEqual(encoder.userInfo[CodingUserInfoKey(rawValue: "encodingKey")!] as? String, "encodingValue")
+                    try value.encode(to: encoder)
+                }
+            }
+            let encoder = CSVEncoder(userInfo: [CodingUserInfoKey(rawValue: "encodingKey")! : "encodingValue"])
+            let decoder = CSVDecoder(userInfo: [CodingUserInfoKey(rawValue: "decodingKey")! : "decodingValue"])
+            let value = Test("some string")
+            try XCTAssertEqual(decoder.decode(Test.self, from: encoder.encode([value])), [value])
+        }
+    }
 
     func testSingleRoundtrip() throws {
         let values = [144, nil]
@@ -146,9 +205,8 @@ final class CSVCoderTests: XCTestCase {
             let dictionary = [1: "test", 3: "some"]
             let array = [nil, "test", nil, "some"]
 
-            // You can not encode with `Array` and decode to `Dictionary` because you'll encode
-            // `[(0: nil), (1: "test"), (2, nil), (3: "some")]`, which has `nil` as value at index 0 and 2.
             try XCTAssertEqual(decoder.decode([Int: String].self, from: encoder.encode([dictionary])), [dictionary])
+            try XCTAssertEqual(decoder.decode([Int: String].self, from: encoder.encode([array])), [dictionary])
             try XCTAssertEqual(decoder.decode([String?].self, from: encoder.encode([dictionary])), [array])
             try XCTAssertEqual(decoder.decode([String?].self, from: encoder.encode([array])), [array])
         }
@@ -200,25 +258,25 @@ final class CSVCoderTests: XCTestCase {
         }
     }
 
-    func testErrors() throws {
+    func testBehaviours() throws {
         do {
-            struct BadKeyedEncodable: Encodable {
-                var duplicateHeader, extraHeader: Bool
+            struct Test: Encodable {
+                var duplicatedValue: String? = nil, addExtraKey = false
 
-                init(duplicateHeader: Bool = false, extraHeader: Bool = false) {
-                    self.duplicateHeader = duplicateHeader
-                    self.extraHeader = extraHeader
+                init(duplicatedValue: String? = nil, addExtraKey: Bool = false) {
+                    self.duplicatedValue = duplicatedValue
+                    self.addExtraKey = addExtraKey
                 }
 
                 func encode(to encoder: Encoder) throws {
                     var container = encoder.container(keyedBy: CodingKeys.self)
-                    try container.encode(false, forKey: .a)
+                    try container.encode("Test", forKey: .a)
 
-                    if duplicateHeader {
-                        try container.encode(true, forKey: .a)
+                    if let value = duplicatedValue {
+                        try container.encode(value, forKey: .a)
                     }
-                    if extraHeader {
-                        try container.encode("something", forKey: .b)
+                    if addExtraKey {
+                        try container.encode("Value", forKey: .b)
                     }
                 }
 
@@ -228,12 +286,19 @@ final class CSVCoderTests: XCTestCase {
             }
 
             // Unconstrained duplicated keys
-            try XCTAssertThrowsError(encoder.encode([BadKeyedEncodable(duplicateHeader: true)]))
+            try XCTAssertThrowsError(encoder.encode([Test(duplicatedValue: "Some value")]))
             // Constrained duplicated keys
-            try XCTAssertThrowsError(encoder.encode([BadKeyedEncodable(), BadKeyedEncodable(duplicateHeader: true)]))
-            // Extra keys
-            try XCTAssertThrowsError(encoder.encode([BadKeyedEncodable(), BadKeyedEncodable(extraHeader: true)]))
+            try XCTAssertThrowsError(encoder.encode([Test(), Test(duplicatedValue: "Other value")]))
+
+            // Unconstrained duplicated keys with same value
+            try XCTAssertNoThrow(encoder.encode([Test(duplicatedValue: "Test")]))
+            // Constrained duplicated keys with same value
+            try XCTAssertNoThrow(encoder.encode([Test(), Test(duplicatedValue: "Test")]))
+
+            // Added extra key in constrained variable
+            try XCTAssertThrowsError(encoder.encode([Test(), Test(addExtraKey: true)]))
         }
+
         do {
             struct BadDecoder: Decodable {
                 init(from decoder: Decoder) throws {
@@ -361,13 +426,14 @@ final class CSVCoderTests: XCTestCase {
     static var allTests = [
         ("testEscaping", testEscaping),
         ("testTokenizer", testTokenizer),
+        ("testCodingKeys", testCodingKeys),
         ("testRoundtrip", testRoundtrip),
 
         ("testSingleRoundtrip", testSingleRoundtrip),
         ("testKeyedRoundtrip", testKeyedRoundtrip),
         ("testUnkeyedRoundtrip", testUnkeyedRoundtrip),
 
-        ("testErrors", testErrors),
+        ("testBehaviours", testBehaviours),
         ("testDecoding", testDecoding),
 
         ("testNestedKeyedContainers", testNestedKeyedContainers),

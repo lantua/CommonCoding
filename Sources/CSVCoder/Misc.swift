@@ -5,7 +5,7 @@
 //  Created by Natchanon Luangsomboon on 1/8/2562 BE.
 //
 
-extension StringProtocol {
+extension String {
     func escaped(separator: Character, forced: Bool) -> String {
         func needEscaping(_ character: Character) -> Bool {
             guard character != separator,
@@ -29,19 +29,17 @@ extension StringProtocol {
         let shouldEscape = forced || contains(where: needEscaping)
         
         guard contains("\"") else {
-            return shouldEscape ? quoted() : String(self)
+            return shouldEscape ? "\"\(self)\"" : self
         }
         assert(shouldEscape)
-        
-        return String(flatMap { character -> [Character] in
-            switch character {
-            case "\"": return ["\"", "\""]
-            default: return [character]
+
+        return reduce(into: "\"") {
+            switch ($1) {
+            case "\"": $0.append("\"\"")
+            default: $0.append($1)
             }
-        }).quoted()
+        } + "\""
     }
-    
-    private func quoted() -> String { return "\"\(self)\"" }
 }
 
 struct UnescapedCSVTokens<S: Sequence>: Sequence where S.Element == Character {

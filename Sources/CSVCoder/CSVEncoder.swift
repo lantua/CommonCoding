@@ -21,42 +21,51 @@ public struct CSVEncodingOptions: OptionSet {
 
 class EncodingContext {
     private let encoder: CSVEncoder, isFixed: Bool
-    private var fieldIndicess: [String: Int], values: [String?]
+    private var fieldIndices: [String: Int], values: [String??]
 
     var userInfo: [CodingUserInfoKey: Any] { return encoder.userInfo }
 
     init(encoder: CSVEncoder, fieldIndices: [String: Int]? = nil) {
         self.encoder = encoder
-        self.fieldIndicess = fieldIndices ?? [:]
+        self.fieldIndices = fieldIndices ?? [:]
         
         isFixed = fieldIndices != nil
         values = Array(repeating: nil, count: (fieldIndices?.count ?? 0))
     }
     
     func add(unescaped: String?, to codingPath: [CodingKey]) throws {
-        let escaped = encoder.escape(unescaped)
         if isFixed {
-            guard let index = fieldIndicess[encoder.field(for: codingPath)] else {
-                guard unescaped != nil else {
+            guard let index = fieldIndices[encoder.field(for: codingPath)] else {
+                if unescaped == nil {
+                    // It's fine to add `nil` to non-existing field
                     return
                 }
-                throw EncodingError.invalidValue(escaped, .init(codingPath: codingPath, debugDescription: "Key does not match any header fields"))
+                throw EncodingError.invalidValue(unescaped as Any, .init(codingPath: codingPath, debugDescription: "Key does not match any header fields"))
             }
-            guard values[index] == nil else {
-                throw EncodingError.invalidValue(escaped, .init(codingPath: codingPath, debugDescription: "Duplicated header field"))
+            if let oldValue = values[index] {
+                if oldValue == unescaped {
+                    // It's fine to add same value to duplicated field
+                    return
+                }
+                throw EncodingError.invalidValue(unescaped as Any, .init(codingPath: codingPath, debugDescription: "Duplicated field"))
             }
             
-            values[index] = escaped
+            values[index] = unescaped
         } else {
-            guard fieldIndicess.updateValue(values.count, forKey: encoder.field(for: codingPath)) == nil else {
-                throw EncodingError.invalidValue(escaped, .init(codingPath: codingPath, debugDescription: "Duplicated header field"))
+            if let oldIndex = fieldIndices.updateValue(values.count, forKey: encoder.field(for: codingPath)) {
+                if values[oldIndex]! == unescaped {
+                    // It's fine to add same value to duplicated field
+                    fieldIndices.updateValue(oldIndex, forKey: encoder.field(for: codingPath))
+                    return
+                }
+                throw EncodingError.invalidValue(unescaped as Any, .init(codingPath: codingPath, debugDescription: "Duplicated field"))
             }
-            values.append(escaped)
+            values.append(unescaped)
         }
     }
     
-    func finalize() -> (fieldIndicess: [String: Int], values: [String]) {
-        return (fieldIndicess, values.map { $0 ?? "" })
+    func finalize() -> (fieldIndicess: [String: Int], values: [String?]) {
+        return (fieldIndices, values.map { $0 as? String })
     }
 }
 
@@ -92,8 +101,7 @@ private struct CSVKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingContainer
     }
 
     mutating func encode<T>(_ value: T, forKey key: Key) throws where T: Encodable {
-        let encoder = CSVInternalEncoder(context: context, codingPath: codingPath(for: key))
-        try value.encode(to: encoder)
+        try value.encode(to: CSVInternalEncoder(context: context, codingPath: codingPath(for: key)))
     }
 
     mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> where NestedKey: CodingKey {
@@ -180,11 +188,11 @@ private struct CSVSingleValueEncodingContainer: SingleValueEncodingContainer {
         try context.add(unescaped: nil, to: codingPath)
     }
 
-    mutating func encode<T>(_ value: T) throws where T : Encodable, T: LosslessStringConvertible {
+    mutating func encode<T>(_ value: T) throws where T: Encodable, T: LosslessStringConvertible {
         try context.add(unescaped: String(value), to: codingPath)
     }
 
-    mutating func encode<T>(_ value: T) throws where T : Encodable {
+    mutating func encode<T>(_ value: T) throws where T: Encodable {
         try value.encode(to: CSVInternalEncoder(context: context, codingPath: codingPath))
     }
 }

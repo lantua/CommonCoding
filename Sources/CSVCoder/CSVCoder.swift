@@ -18,9 +18,13 @@ public struct CSVEncoder {
         self.userInfo = userInfo
     }
 
-    func escape(_ string: String?) -> String {
-        return string?.escaped(separator: separator, forced: options.contains(.alwaysQuote)) ??
-            (options.contains(.useNullasNil) ? "null" : "")
+    private func escape(_ string: String?) -> String {
+        switch string {
+        case nil: return options.contains(.useNullasNil) ? "null" : ""
+        case "null" where options.contains(.useNullasNil): return "\"null\""
+        case let string?:
+            return string.escaped(separator: separator, forced: options.contains(.alwaysQuote))
+        }
     }
 
     func field(for codingPath: [CodingKey]) -> String {
@@ -55,7 +59,7 @@ public struct CSVEncoder {
             }
             assert(fieldIndices == currentFieldIndices)
 
-            print(entry.joined(separator: separator), to: &output)
+            print(entry.map(escape).joined(separator: separator), to: &output)
         }
     }
 }

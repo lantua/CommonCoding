@@ -42,8 +42,8 @@ struct DecodingContext {
         return result
     }
 
-    func containsValue(at index: Int) -> Bool {
-        return values[index] != nil
+    func isEmpty(at fieldIndex: Trie<Int>) -> Bool {
+        return !fieldIndex.contains { values[$0] != nil }
     }
 }
 
@@ -72,7 +72,11 @@ struct CSVInternalDecoder: Decoder {
 
 private struct CSVKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainerProtocol {
     let context: DecodingContext, fieldIndices: Trie<Int>, codingPath: [CodingKey]
-    var allKeys: [Key] { return fieldIndices.children.keys.compactMap { Key(stringValue: String($0)) } }
+    var allKeys: [Key] {
+        return fieldIndices.children.compactMap {
+            return context.isEmpty(at: $0.value) ? nil : Key(stringValue: $0.key)
+        }
+    }
     
     init(context: DecodingContext, fieldIndices: Trie<Int>, codingPath: [CodingKey]) {
         self.context = context
@@ -94,7 +98,7 @@ private struct CSVKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainer
     func contains(_ key: Key) -> Bool { return fieldIndices[key] != nil }
     
     func decodeNil(forKey key: Key) throws -> Bool {
-        return try !fieldIndices(for: key).contains(predicate: context.containsValue(at:))
+        return try context.isEmpty(at: fieldIndices(for: key))
     }
 
     func decode<T>(_ type: T.Type, forKey key: Key) throws -> T where T: Decodable, T: LosslessStringConvertible {
@@ -135,7 +139,7 @@ private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
         self.codingPath = codingPath
         
         let candidates = fieldIndices.children.compactMap {
-            $0.value.contains(predicate: context.containsValue(at:)) ? Int($0.key) : nil
+            return context.isEmpty(at: $0.value) ? nil : Int($0.key)
         }
         count = 1 + (candidates.max() ?? -1)
     }
@@ -153,12 +157,12 @@ private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     }
 
     mutating func decodeNil() throws -> Bool {
-        let hasValue = try consumeFieldIndices().contains(predicate: context.containsValue(at:))
-        if hasValue {
+        let isEmpty = try context.isEmpty(at: consumeFieldIndices())
+        if !isEmpty {
             currentIndex -= 1
             assert(currentIndex >= 0)
         }
-        return !hasValue
+        return isEmpty
     }
     
     mutating func decode<T>(_ type: T.Type) throws -> T where T: Decodable, T: LosslessStringConvertible {
@@ -189,7 +193,7 @@ private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
 private struct CSVSingleValueDecodingContainer: SingleValueDecodingContainer {
     let context: DecodingContext, fieldIndices: Trie<Int>, codingPath: [CodingKey]
     
-    func decodeNil() -> Bool { return !fieldIndices.contains(predicate: context.containsValue(at:)) }
+    func decodeNil() -> Bool { return context.isEmpty(at: fieldIndices) }
 
     func decode<T>(_ type: T.Type) throws -> T where T: Decodable, T: LosslessStringConvertible {
         return try context.value(at: fieldIndices, codingPath: codingPath)

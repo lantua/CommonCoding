@@ -142,6 +142,16 @@ final class CSVCoderTests: XCTestCase {
             ]
             try XCTAssertEqual(decoder.decode(Test.self, from: encoder.encode(values)), values)
         }
+        do { // Interesting interaction between Dictionary and Array
+            let dictionary = [1: "test", 3: "some"]
+            let array = [nil, "test", nil, "some"]
+
+            // You can not encode with `Array` and decode to `Dictionary` because you'll encode
+            // `[(0: nil), (1: "test"), (2, nil), (3: "some")]`, which has `nil` as value at index 0 and 2.
+            try XCTAssertEqual(decoder.decode([Int: String].self, from: encoder.encode([dictionary])), [dictionary])
+            try XCTAssertEqual(decoder.decode([String?].self, from: encoder.encode([dictionary])), [array])
+            try XCTAssertEqual(decoder.decode([String?].self, from: encoder.encode([array])), [array])
+        }
     }
 
     func testUnkeyedRoundtrip() throws {

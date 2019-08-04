@@ -12,9 +12,9 @@ public struct CSVDecodingOptions: OptionSet {
     }
 
     /// Treat unescaped "" as non-nil empty string, also applied to header
-    public static let treatEmptyStringAsValue = CSVDecodingOptions(rawValue: 1 << 0)
+    public static let treatEmptyStringAsValue   = CSVDecodingOptions(rawValue: 1 << 0)
     /// Treat unescaped "null" as nil value, also applied to header
-    public static let treatNullAsNil        = CSVDecodingOptions(rawValue: 1 << 1)
+    public static let treatNullAsNil            = CSVDecodingOptions(rawValue: 1 << 1)
 }
 
 struct DecodingContext {
@@ -42,8 +42,8 @@ struct DecodingContext {
         return result
     }
 
-    func isEmpty(at fieldIndex: Trie<Int>) -> Bool {
-        return !fieldIndex.contains { values[$0] != nil }
+    func hasValue(at fieldIndex: Trie<Int>) -> Bool {
+        return fieldIndex.contains { values[$0] != nil }
     }
 }
 
@@ -73,8 +73,13 @@ struct CSVInternalDecoder: Decoder {
 private struct CSVKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainerProtocol {
     let context: DecodingContext, fieldIndices: Trie<Int>, codingPath: [CodingKey]
     var allKeys: [Key] {
+        // Added only keys with non-nil value.
+        //
+        // Decodables that uses this is usually dynamic, so `nil` fields would be used
+        // to mark the absence of key. If the key definitely must be present, it's usually
+        // hard-coded in the generated/user-defined `init(from:)` and bypass this value anyway.
         return fieldIndices.children.compactMap {
-            return context.isEmpty(at: $0.value) ? nil : Key(stringValue: $0.key)
+            return context.hasValue(at: $0.value) ? Key(stringValue: $0.key) : nil
         }
     }
     
@@ -98,7 +103,7 @@ private struct CSVKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainer
     func contains(_ key: Key) -> Bool { return fieldIndices[key] != nil }
     
     func decodeNil(forKey key: Key) throws -> Bool {
-        return try context.isEmpty(at: fieldIndices(for: key))
+        return try !context.hasValue(at: fieldIndices(for: key))
     }
 
     func decode<T>(_ type: T.Type, forKey key: Key) throws -> T where T: Decodable, T: LosslessStringConvertible {
@@ -138,10 +143,14 @@ private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
         self.fieldIndices = fieldIndices
         self.codingPath = codingPath
         
-        let candidates = fieldIndices.children.compactMap {
-            return context.isEmpty(at: $0.value) ? nil : Int($0.key)
+        count = 1 + fieldIndices.children.reduce(-1) { current, entry in
+            if let candidate = Int(entry.key),
+                candidate > current,
+                context.hasValue(at: entry.value) {
+                return candidate
+            }
+            return current
         }
-        count = 1 + (candidates.max() ?? -1)
     }
 
     private var currentKey: CodingKey { return UnkeyedCodingKey(intValue: currentIndex) }
@@ -157,16 +166,17 @@ private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     }
 
     mutating func decodeNil() throws -> Bool {
-        let isEmpty = try context.isEmpty(at: consumeFieldIndices())
-        if !isEmpty {
+        let hasValue = try context.hasValue(at: consumeFieldIndices())
+        if hasValue {
             currentIndex -= 1
             assert(currentIndex >= 0)
         }
-        return isEmpty
+        return !hasValue
     }
     
     mutating func decode<T>(_ type: T.Type) throws -> T where T: Decodable, T: LosslessStringConvertible {
-        return try context.value(at: consumeFieldIndices(), codingPath: currentCodingPath)
+        let currentFieldIndices = try consumeFieldIndices() // Must run before `currentCodingPath` is accessed below
+        return try context.value(at: currentFieldIndices, codingPath: currentCodingPath)
     }
     
     mutating func decode<T>(_ type: T.Type) throws -> T where T: Decodable {
@@ -193,7 +203,7 @@ private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
 private struct CSVSingleValueDecodingContainer: SingleValueDecodingContainer {
     let context: DecodingContext, fieldIndices: Trie<Int>, codingPath: [CodingKey]
     
-    func decodeNil() -> Bool { return context.isEmpty(at: fieldIndices) }
+    func decodeNil() -> Bool { return !context.hasValue(at: fieldIndices) }
 
     func decode<T>(_ type: T.Type) throws -> T where T: Decodable, T: LosslessStringConvertible {
         return try context.value(at: fieldIndices, codingPath: codingPath)

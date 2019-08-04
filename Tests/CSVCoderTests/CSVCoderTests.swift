@@ -141,16 +141,13 @@ final class CSVCoderTests: XCTestCase {
 
     func testRoundtrip() {
         do {
-            let values: Int? = nil
+            let value1: Int? = nil
             let encoder = CSVEncoder(options: .useNullasNil)
             let decoder = CSVDecoder(options: .treatNullAsNil)
-            try XCTAssertEqual(decoder.decode(Int?.self, from: encoder.encode([values])), [values])
-        }
-        do {
-            let value = "null"
-            let encoder = CSVEncoder(options: .useNullasNil)
-            let decoder = CSVDecoder(options: .treatNullAsNil)
-            try XCTAssertEqual(decoder.decode(String?.self, from: encoder.encode([value])), [value])
+            try XCTAssertEqual(decoder.decode(Int?.self, from: encoder.encode([value1])), [value1])
+
+            let value2 = "null"
+            try XCTAssertEqual(decoder.decode(String?.self, from: encoder.encode([value2])), [value2])
         }
         do {
             struct Test: Codable, Equatable {
@@ -201,15 +198,6 @@ final class CSVCoderTests: XCTestCase {
             ]
             try XCTAssertEqual(decoder.decode(Test.self, from: encoder.encode(values)), values)
         }
-        do { // Interesting interaction between Dictionary and Array
-            let dictionary = [1: "test", 3: "some"]
-            let array = [nil, "test", nil, "some"]
-
-            try XCTAssertEqual(decoder.decode([Int: String].self, from: encoder.encode([dictionary])), [dictionary])
-            try XCTAssertEqual(decoder.decode([Int: String].self, from: encoder.encode([array])), [dictionary])
-            try XCTAssertEqual(decoder.decode([String?].self, from: encoder.encode([dictionary])), [array])
-            try XCTAssertEqual(decoder.decode([String?].self, from: encoder.encode([array])), [array])
-        }
     }
 
     func testUnkeyedRoundtrip() throws {
@@ -259,6 +247,16 @@ final class CSVCoderTests: XCTestCase {
     }
 
     func testBehaviours() throws {
+        do { // Interesting interaction between Dictionary and Array
+            let dictionary = [1: "test", 3: "some"]
+            let array = [nil, "test", nil, "some"]
+
+            try XCTAssertEqual(decoder.decode([Int: String].self, from: encoder.encode([dictionary])), [dictionary])
+            try XCTAssertEqual(decoder.decode([Int: String].self, from: encoder.encode([array])), [dictionary])
+            try XCTAssertEqual(decoder.decode([String?].self, from: encoder.encode([dictionary])), [array])
+            try XCTAssertEqual(decoder.decode([String?].self, from: encoder.encode([array])), [array])
+        }
+
         do {
             struct Test: Encodable {
                 var duplicatedValue: String? = nil, addExtraKey = false
@@ -320,7 +318,7 @@ final class CSVCoderTests: XCTestCase {
 
             try XCTAssertThrowsError(decoder.decode(Test.self, from: "s,g\nkjk,ll")) // Key not found
             try XCTAssertThrowsError(decoder.decode(Test.self, from: "s,b\nsomeString,")) // Value not found
-            try XCTAssertThrowsError(decoder.decode(Test.self, from: "s.1,s.3,b\n4,ll,true")) // Complex as simple
+            try XCTAssertThrowsError(decoder.decode(Test.self, from: "s.1,s.3,b\n4,ll,true")) // Multi-field as simple object
             try XCTAssertThrowsError(decoder.decode(Test.self, from: "s,b\nsdff,0.5")) // Type mismatch
         }
         do {

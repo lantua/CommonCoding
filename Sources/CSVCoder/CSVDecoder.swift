@@ -156,46 +156,48 @@ private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     private var currentKey: CodingKey { return UnkeyedCodingKey(intValue: currentIndex) }
     private var currentCodingPath: [CodingKey] { return codingPath + [currentKey] }
 
-    private mutating func consumeFieldIndices() throws -> Trie<Int> {
-        guard currentIndex < count! else {
-            throw DecodingError.keyNotFound(currentKey, .init(codingPath: codingPath, debugDescription: ""))
-        }
-
+    private mutating func consumeFieldIndices() -> Trie<Int> {
+        // We could check against `count` bound, but that would make it impossible to decode `Optional` past
+        // the last non-nil value. That's probably not what we want
         defer { currentIndex += 1 }
         return fieldIndices[currentKey] ?? Trie()
     }
 
     mutating func decodeNil() throws -> Bool {
-        let hasValue = try context.hasValue(at: consumeFieldIndices())
-        if hasValue {
-            currentIndex -= 1
-            assert(currentIndex >= 0)
+        let hasValue = fieldIndices[currentKey].map(context.hasValue(at:)) ?? false
+        if !hasValue {
+            _ = consumeFieldIndices()
         }
         return !hasValue
     }
     
     mutating func decode<T>(_ type: T.Type) throws -> T where T: Decodable, T: LosslessStringConvertible {
-        let currentFieldIndices = try consumeFieldIndices() // Must run before `currentCodingPath` is accessed below
+        // Must call `consumeFieldIndices` before accessing `currentCodingPath` below
+        let currentFieldIndices = consumeFieldIndices()
         return try context.value(at: currentFieldIndices, codingPath: currentCodingPath)
     }
     
     mutating func decode<T>(_ type: T.Type) throws -> T where T: Decodable {
-        let currentFieldIndices = try consumeFieldIndices() // Must run before `currentCodingPath` is accessed below
+        // Must call `consumeFieldIndices` before accessing `currentCodingPath` below
+        let currentFieldIndices = consumeFieldIndices()
         return try .init(from: CSVInternalDecoder(context: context, fieldIndices: currentFieldIndices, codingPath: currentCodingPath))
     }
     
     mutating func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type) throws -> KeyedDecodingContainer<NestedKey> where NestedKey: CodingKey {
-        let currentFieldIndices = try consumeFieldIndices() // Must run before `currentCodingPath` is accessed below
+        // Must call `consumeFieldIndices` before accessing `currentCodingPath` below
+        let currentFieldIndices = consumeFieldIndices()
         return .init(CSVKeyedDecodingContainer(context: context, fieldIndices: currentFieldIndices, codingPath: currentCodingPath))
     }
     
     mutating func nestedUnkeyedContainer() throws -> UnkeyedDecodingContainer {
-        let currentFieldIndices = try consumeFieldIndices() // Must run before `currentCodingPath` is accessed below
+        // Must call `consumeFieldIndices` before accessing `currentCodingPath` below
+        let currentFieldIndices = consumeFieldIndices()
         return CSVUnkeyedDecodingContainer(context: context, fieldIndices: currentFieldIndices, codingPath: currentCodingPath)
     }
     
     mutating func superDecoder() throws -> Decoder {
-        let currentFieldIndices = try consumeFieldIndices() // Must run before `currentCodingPath` is accessed below
+        // Must call `consumeFieldIndices` before accessing `currentCodingPath` below
+        let currentFieldIndices = consumeFieldIndices()
         return CSVInternalDecoder(context: context, fieldIndices: currentFieldIndices, codingPath: currentCodingPath)
     }
 }

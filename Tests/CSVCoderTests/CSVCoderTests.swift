@@ -229,15 +229,15 @@ final class CSVCoderTests: XCTestCase {
                 init(from decoder: Decoder) throws {
                     var container = try decoder.unkeyedContainer()
                     b = try container.decodeIfPresent(Bool.self)
-                    c = try container.decode(Int?.self)
                     s = try container.decode(String.self)
+                    c = try container.decode(Int?.self)
                 }
 
                 func encode(to encoder: Encoder) throws {
                     var container = encoder.unkeyedContainer()
                     try container.encode(b)
-                    try container.encodeNil()
                     try container.encode(s)
+                    try container.encodeNil()
                 }
             }
 
@@ -331,6 +331,25 @@ final class CSVCoderTests: XCTestCase {
 
     func testDecoding() throws {
         try XCTAssertEqual(decoder.decode([Int?].self, from: "0,2\n\"1\",2"), [[1, nil, 2]])
+        do {
+            struct Test: Decodable, Equatable {
+                var a: Int?, b: Int?, c: Int?
+
+                init(a: Int?, b: Int?, c: Int?) {
+                    self.a = a
+                    self.b = b
+                    self.c = c
+                }
+
+                init(from decoder: Decoder) throws {
+                    var container = try decoder.unkeyedContainer()
+                    a = try container.decodeIfPresent(Int.self)
+                    b = try container.decodeIfPresent(Int.self)
+                    c = try container.decodeIfPresent(Int.self)
+                }
+            }
+            try XCTAssertEqual(decoder.decode(Test.self, from: "0,2\n1,2"), [Test(a: 1, b: nil, c: 2)])
+        }
     }
     
     func testNestedKeyedContainers() throws {

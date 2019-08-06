@@ -1,4 +1,5 @@
 import XCTest
+import Common
 @testable import CSVCoder
 
 final class CSVCoderTests: XCTestCase {
@@ -320,6 +321,7 @@ final class CSVCoderTests: XCTestCase {
             try XCTAssertThrowsError(decoder.decode(Test.self, from: "s,b\nsomeString,")) // Value not found
             try XCTAssertThrowsError(decoder.decode(Test.self, from: "s.1,s.3,b\n4,ll,true")) // Multi-field as simple object
             try XCTAssertThrowsError(decoder.decode(Test.self, from: "s,b\nsdff,0.5")) // Type mismatch
+            try XCTAssertThrowsError(decoder.decode(Test.self, from: "s,s.1,s.3,b\n883,4,ll,true")) // Mixed multi/single field
         }
         do {
             try XCTAssertThrowsError(decoder.decode(Int.self, from: "\n1\n7,")) // Unequal rows
@@ -349,6 +351,50 @@ final class CSVCoderTests: XCTestCase {
                 }
             }
             try XCTAssertEqual(decoder.decode(Test.self, from: "0,2\n1,2"), [Test(a: 1, b: nil, c: 2)])
+        }
+    }
+
+    func testSchema() throws {
+        do {
+            let schema = Schema.unkeyed([.single(2), .single(0)])
+            let string = """
+            a,b,asdf
+            3,5,1
+            """
+            try XCTAssertEqual(decoder.decode([Int].self, from: string, schema: schema), [[1,3]])
+            try XCTAssertEqual(decoder.decode([String: Int].self, from: string, schema: schema), [["0": 1, "1": 3]])
+            try XCTAssertEqual(decoder.decode([Int: Int].self, from: string, schema: schema), [[0: 1, 1: 3]])
+        }
+        do {
+            let schema = Schema.keyed(["1": .single(4), "a": .single(1), "3": .single(0)])
+            let string = """
+            a,b,asdf
+            3,5,1
+            """
+            try XCTAssertEqual(decoder.decode([Int?].self, from: string, schema: schema), [[nil, nil, nil, 3]])
+            try XCTAssertEqual(decoder.decode([String: Int].self, from: string, schema: schema), [["a": 5, "3": 3]])
+        }
+        do {
+            let schema = Schema.single(0)
+            let string = """
+            1,2,0
+            3,5,1
+            """
+            try XCTAssertEqual(decoder.decode([String: Int].self, from: string), [["1": 3, "2": 5, "0": 1]])
+            try XCTAssertEqual(decoder.decode([Int].self, from: string), [[1, 3, 5]])
+            try XCTAssertThrowsError(decoder.decode([String: Int].self, from: string, schema: schema))
+            try XCTAssertThrowsError(decoder.decode([Int].self, from: string, schema: schema))
+        }
+        do {
+            let schema = Schema<Int>.keyed([:])
+            let string = """
+            1,2,3
+            3,5,5
+            """
+            try XCTAssertEqual(decoder.decode([Int?].self, from: string), [[nil,3,5,5]])
+            try XCTAssertEqual(decoder.decode([Int: Int].self, from: string), [[1: 3, 2: 5, 3: 5]])
+            try XCTAssertEqual(decoder.decode([Int].self, from: string, schema: schema), [[]])
+            try XCTAssertEqual(decoder.decode([Int: Int].self, from: string, schema: schema), [[:]])
         }
     }
     

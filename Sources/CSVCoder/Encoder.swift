@@ -1,23 +1,9 @@
 //
-//  CSVEncoder.swift
+//  Encoder.swift
 //  CSVCoder
 //
 //  Created by Natchanon Luangsomboon on 31/7/2562 BE.
 //
-
-public struct CSVEncodingOptions: OptionSet {
-    public let rawValue: Int
-    public init(rawValue: Int) {
-        self.rawValue = rawValue
-    }
-
-    /// Don't write header line
-    public static let omitHeader        = CSVEncodingOptions(rawValue: 1 << 0)
-    /// Force escape every value
-    public static let alwaysQuote       = CSVEncodingOptions(rawValue: 1 << 1)
-    /// Use unescaped "null" as nil value
-    public static let useNullasNil      = CSVEncodingOptions(rawValue: 1 << 2)
-}
 
 class EncodingContext {
     private let encoder: CSVEncoder, isFixed: Bool
@@ -64,7 +50,7 @@ class EncodingContext {
         }
     }
     
-    func finalize() -> (fieldIndicess: [String: Int], values: [String?]) {
+    func finalize() -> (fieldIndices: [String: Int], values: [String?]) {
         return (fieldIndices, values.map { $0 as? String })
     }
 }

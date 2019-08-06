@@ -5,13 +5,11 @@
 //  Created by Natchanon Luangsomboon on 1/8/2562 BE.
 //
 
+import Common
+
 struct Trie<Value> {
     private(set) var children: [String: Trie] = [:]
     private(set) var value: Value?
-    
-    subscript(key: CodingKey) -> Trie? {
-        return children[key.stringValue]
-    }
     
     mutating func add(_ value: Value, to path: [String]) -> Value? {
         return add(value, to: path[...])
@@ -26,13 +24,18 @@ struct Trie<Value> {
         
         return children[first, default: Trie()].add(value, to: path.dropFirst())
     }
+}
 
-    func contains(predicate: (Value) throws -> Bool) rethrows -> Bool {
-        if let value = value,
-            try predicate(value) {
-            return true
+extension Trie {
+    func toSchema() throws -> Schema<Value> {
+        guard value == nil || children.isEmpty else {
+            throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Found mixed multi/single field."))
         }
 
-        return try children.values.contains { try $0.contains(predicate: predicate) }
+        if let value = value {
+            return .single(value)
+        }
+
+        return try .keyed(children.mapValues { try $0.toSchema() })
     }
 }

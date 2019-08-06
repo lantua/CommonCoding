@@ -10,6 +10,9 @@ let package = Package(
         .library(
             name: "CSVCoder",
             targets: ["CSVCoder"]),
+        .library(
+            name: "BinaryCoder",
+            targets: ["BinaryCoder"]),
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.
@@ -19,10 +22,22 @@ let package = Package(
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.
         // Targets can depend on other targets in this package, and on products in packages which this package depends on.
         .target(
-            name: "CSVCoder",
+            name: "Common",
             dependencies: []),
+        .target(
+            name: "CSVCoder",
+            dependencies: ["Common"]),
+        .target(
+            name: "BinaryCoder",
+            dependencies: ["Common"]),
+        .testTarget(
+            name: "CommonTests",
+            dependencies: ["Common"]),
         .testTarget(
             name: "CSVCoderTests",
             dependencies: ["CSVCoder"]),
+        .testTarget(
+            name: "BinaryCoderTests",
+            dependencies: ["BinaryCoder"]),
     ]
 )

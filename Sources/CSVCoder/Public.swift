@@ -1,9 +1,25 @@
 //
-//  CSVCoder.swift
+//  Public.swift
 //  CSVCoder
 //
 //  Created by Natchanon Luangsomboon on 1/8/2562 BE.
 //
+
+import Common
+
+public struct CSVEncodingOptions: OptionSet {
+    public let rawValue: Int
+    public init(rawValue: Int) {
+        self.rawValue = rawValue
+    }
+
+    /// Don't write header line
+    public static let omitHeader        = CSVEncodingOptions(rawValue: 1 << 0)
+    /// Force escape every value
+    public static let alwaysQuote       = CSVEncodingOptions(rawValue: 1 << 1)
+    /// Use unescaped "null" as nil value
+    public static let useNullasNil      = CSVEncodingOptions(rawValue: 1 << 2)
+}
 
 public struct CSVEncoder {
     public var options: CSVEncodingOptions
@@ -64,6 +80,18 @@ public struct CSVEncoder {
     }
 }
 
+public struct CSVDecodingOptions: OptionSet {
+    public let rawValue: Int
+    public init(rawValue: Int) {
+        self.rawValue = rawValue
+    }
+
+    /// Treat unescaped "" as non-nil empty string, also applied to header
+    public static let treatEmptyStringAsValue   = CSVDecodingOptions(rawValue: 1 << 0)
+    /// Treat unescaped "null" as nil value, also applied to header
+    public static let treatNullAsNil            = CSVDecodingOptions(rawValue: 1 << 1)
+}
+
 public struct CSVDecoder {
     public var options: CSVDecodingOptions
     public var userInfo: [CodingUserInfoKey: Any]
@@ -77,8 +105,8 @@ public struct CSVDecoder {
         self.userInfo = userInfo
     }
     
-    public func decode<S, T>(_ type: T.Type, from string: S) throws -> [T] where S: Sequence, S.Element == Character, T: Decodable {
-        var buffer: [String?] = [], fieldIndices: Trie<Int>!, fieldCount: Int!, results: [T] = []
+    public func decode<S, T>(_ type: T.Type, from string: S, schema: Schema<Int>? = nil) throws -> [T] where S: Sequence, S.Element == Character, T: Decodable {
+        var buffer: [String?] = [], schema: Schema! = schema, fieldCount: Int?, results: [T] = []
         for token in UnescapedCSVTokens(base: string, separator: separator) {
             switch token {
             case let .escaped(string): buffer.append(string)
@@ -95,14 +123,18 @@ public struct CSVDecoder {
             case .rowBoundary:
                 defer { buffer.removeAll(keepingCapacity: true) }
                 
-                guard fieldIndices != nil else {
-                    fieldIndices = Trie()
+                guard fieldCount != nil else {
                     fieldCount = buffer.count
-                    for (offset, field) in buffer.enumerated() {
-                        let path = field?.split(separator: subheaderSeparator).map(String.init) ?? []
-                        guard fieldIndices!.add(offset, to: path) == nil else {
-                            throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Duplicated field \(field ?? "")"))
+
+                    if schema == nil {
+                        var fieldIndices = Trie<Int>()
+                        for (offset, field) in buffer.enumerated() {
+                            let path = field?.split(separator: subheaderSeparator).map(String.init) ?? []
+                            guard fieldIndices.add(offset, to: path) == nil else {
+                                throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Duplicated field \(field ?? "")"))
+                            }
                         }
+                        schema = try fieldIndices.toSchema()
                     }
                     continue
                 }
@@ -112,7 +144,7 @@ public struct CSVDecoder {
                 }
                 
                 let context = DecodingContext(decoder: self, values: buffer)
-                let decoder = CSVInternalDecoder(context: context, fieldIndices: fieldIndices, codingPath: [])
+                let decoder = CSVInternalDecoder(context: context, scope: (schema, []))
                 try results.append(T(from: decoder))
             }
         }

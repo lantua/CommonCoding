@@ -1,5 +1,5 @@
 import XCTest
-@testable import BinaryCoder
+@testable import LNTBinaryCoder
 
 final class BinaryCoderTests: XCTestCase {
     func testNothing() {

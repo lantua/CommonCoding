@@ -1,6 +1,6 @@
 import XCTest
-import Common
-@testable import CSVCoder
+import LNTCommonCoder
+@testable import LNTCSVCoder
 
 final class CSVCoderTests: XCTestCase {
     let encoder = CSVEncoder(), decoder = CSVDecoder()

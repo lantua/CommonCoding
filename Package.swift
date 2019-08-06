@@ -8,11 +8,11 @@ let package = Package(
     products: [
         // Products define the executables and libraries produced by a package, and make them visible to other packages.
         .library(
-            name: "CSVCoder",
-            targets: ["CSVCoder"]),
+            name: "LNTCSVCoder",
+            targets: ["LNTCSVCoder"]),
         .library(
-            name: "BinaryCoder",
-            targets: ["BinaryCoder"]),
+            name: "LNTBinaryCoder",
+            targets: ["LNTBinaryCoder"]),
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.
@@ -22,22 +22,22 @@ let package = Package(
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.
         // Targets can depend on other targets in this package, and on products in packages which this package depends on.
         .target(
-            name: "Common",
+            name: "LNTCommonCoder",
             dependencies: []),
         .target(
-            name: "CSVCoder",
-            dependencies: ["Common"]),
+            name: "LNTCSVCoder",
+            dependencies: ["LNTCommonCoder"]),
         .target(
-            name: "BinaryCoder",
-            dependencies: ["Common"]),
+            name: "LNTBinaryCoder",
+            dependencies: ["LNTCommonCoder"]),
         .testTarget(
-            name: "CommonTests",
-            dependencies: ["Common"]),
+            name: "LNTCommonCoderTests",
+            dependencies: ["LNTCommonCoder"]),
         .testTarget(
-            name: "CSVCoderTests",
-            dependencies: ["CSVCoder"]),
+            name: "LNTCSVCoderTests",
+            dependencies: ["LNTCSVCoder"]),
         .testTarget(
-            name: "BinaryCoderTests",
-            dependencies: ["BinaryCoder"]),
+            name: "LNTBinaryCoderTests",
+            dependencies: ["LNTBinaryCoder"]),
     ]
 )

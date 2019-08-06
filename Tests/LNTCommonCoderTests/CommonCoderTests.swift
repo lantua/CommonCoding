@@ -1,7 +1,7 @@
 import XCTest
-@testable import Common
+@testable import LNTCommonCoder
 
-final class CommonTests: XCTestCase {
+final class CommonCoderTests: XCTestCase {
     func testSchema() throws {
         let schema: Schema<Int> = [
             .init(value: 1),
@@ -104,6 +104,7 @@ final class CommonTests: XCTestCase {
     static var allTests = [
         ("testSchema", testSchema),
         ("testSchemaErrors", testSchemaErrors),
+        ("testSchemaConversion", testSchemaConversion),
     ]
 }
 

@@ -5,7 +5,7 @@
 //  Created by Natchanon Luangsomboon on 1/8/2562 BE.
 //
 
-import Common
+import LNTCommonCoder
 
 struct DecodingContext {
     private let decoder: CSVDecoder

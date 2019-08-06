@@ -22,14 +22,14 @@ class EncodingContext {
     func add(unescaped: String?, to codingPath: [CodingKey]) throws {
         if isFixed {
             guard let index = fieldIndices[encoder.field(for: codingPath)] else {
-                if unescaped == nil {
+                guard unescaped != nil else {
                     // It's fine to add `nil` to non-existing field
                     return
                 }
                 throw EncodingError.invalidValue(unescaped as Any, .init(codingPath: codingPath, debugDescription: "Key does not match any header fields"))
             }
             if let oldValue = values[index] {
-                if oldValue == unescaped {
+                guard oldValue != unescaped else {
                     // It's fine to add same value to duplicated field
                     return
                 }
@@ -39,7 +39,7 @@ class EncodingContext {
             values[index] = unescaped
         } else {
             if let oldIndex = fieldIndices.updateValue(values.count, forKey: encoder.field(for: codingPath)) {
-                if values[oldIndex]! == unescaped {
+                guard values[oldIndex]! != unescaped else {
                     // It's fine to add same value to duplicated field
                     fieldIndices.updateValue(oldIndex, forKey: encoder.field(for: codingPath))
                     return
@@ -139,9 +139,8 @@ private struct CSVUnkeyedEncodingContainer: UnkeyedEncodingContainer {
     }
     
     private mutating func consumeCodingPath() -> [CodingKey] {
-        let key = UnkeyedCodingKey(intValue: count)
-        count += 1
-        return codingPath + [key]
+        defer { count += 1 }
+        return codingPath + [UnkeyedCodingKey(intValue: count)]
     }
     
     mutating func encodeNil() throws { try context.add(unescaped: nil, to: consumeCodingPath()) }

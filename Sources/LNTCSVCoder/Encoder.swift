@@ -1,6 +1,6 @@
 //
 //  Encoder.swift
-//  CSVCoder
+//  LNTCSVCoder
 //
 //  Created by Natchanon Luangsomboon on 31/7/2562 BE.
 //

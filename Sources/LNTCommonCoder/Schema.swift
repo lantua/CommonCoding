@@ -1,11 +1,9 @@
 //
 //  Schema.swift
-//  BinaryCoder
+//  LNTCommonCoder
 //
 //  Created by Natchanon Luangsomboon on 5/8/2562 BE.
 //
-
-import Foundation
 
 public final class Schema<Value> {
     enum Raw {

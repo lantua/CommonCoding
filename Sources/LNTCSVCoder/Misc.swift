@@ -1,11 +1,9 @@
 //
 //  Misc.swift
-//  CSVCoder
+//  LNTCSVCoder
 //
 //  Created by Natchanon Luangsomboon on 1/8/2562 BE.
 //
-
-import LNTCommonCoder
 
 extension String {
     func escaped(separator: Character, forced: Bool) -> String {

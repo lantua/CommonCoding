@@ -1,5 +1,4 @@
 import XCTest
-import LNTCommonCoder
 @testable import LNTCSVCoder
 
 final class CSVCoderTests: XCTestCase {
@@ -137,6 +136,10 @@ final class CSVCoderTests: XCTestCase {
 
             let key4: CodingKey? = SuperCodingKey(stringValue: "Something else")
             XCTAssertNil(key4)
+
+            let key5: CodingKey? = SuperCodingKey()
+            XCTAssertEqual(key5?.intValue, 0)
+            XCTAssertEqual(key5?.stringValue, "super")
         }
     }
 
@@ -199,6 +202,10 @@ final class CSVCoderTests: XCTestCase {
             ]
             try XCTAssertEqual(decoder.decode(Test.self, from: encoder.encode(values)), values)
         }
+        do {
+            let values = [["a": 1, "b": 2], ["a": 3]]
+            try XCTAssertEqual(decoder.decode([String: Int].self, from: encoder.encode(values)), values)
+        }
     }
 
     func testUnkeyedRoundtrip() throws {
@@ -220,7 +227,7 @@ final class CSVCoderTests: XCTestCase {
 
         do { // Statically call decode(_:), decodeIfPresent(_:)
             struct Test: Codable, Equatable {
-                var s: String, b: Bool?, c: Int?
+                var s: String, b: Bool?, c: Int?, d: Double?
 
                 init(s: String, b: Bool?) {
                     self.s = s
@@ -229,15 +236,16 @@ final class CSVCoderTests: XCTestCase {
 
                 init(from decoder: Decoder) throws {
                     var container = try decoder.unkeyedContainer()
-                    b = try container.decodeIfPresent(Bool.self)
                     s = try container.decode(String.self)
+                    b = try container.decodeIfPresent(Bool.self)
                     c = try container.decode(Int?.self)
+                    d = try container.decodeIfPresent(Double.self)
                 }
 
                 func encode(to encoder: Encoder) throws {
                     var container = encoder.unkeyedContainer()
-                    try container.encode(b)
                     try container.encode(s)
+                    try container.encode(b)
                     try container.encodeNil()
                 }
             }
@@ -248,6 +256,10 @@ final class CSVCoderTests: XCTestCase {
     }
 
     func testBehaviours() throws {
+        do {
+            try XCTAssertEqual(decoder.decode(Int.self, from: "\n1\n2\n3\n"), [1, 2, 3])
+        }
+
         do { // Interesting interaction between Dictionary and Array
             let dictionary = [1: "test", 3: "some"]
             let array = [nil, "test", nil, "some"]
@@ -324,6 +336,14 @@ final class CSVCoderTests: XCTestCase {
             try XCTAssertThrowsError(decoder.decode(Test.self, from: "s,s.1,s.3,b\n883,4,ll,true")) // Mixed multi/single field
         }
         do {
+            struct Test: Decodable, Equatable {
+                var a: [Int?], d: [Int: String]
+            }
+            try XCTAssertThrowsError(decoder.decode(Test.self, from: "a,d.1\n3,sdf")) // Complex as simple object
+            try XCTAssertThrowsError(decoder.decode(Test.self, from: "a.1,d\n3,sdf")) // Complex as simple object
+            try XCTAssertEqual(decoder.decode(Test.self, from: "a.1,d.1\n3,sdf"), [Test(a: [nil, 3], d: [1: "sdf"])])
+        }
+        do {
             try XCTAssertThrowsError(decoder.decode(Int.self, from: "\n1\n7,")) // Unequal rows
             try XCTAssertThrowsError(decoder.decode(Int.self, from: "b,a,a,d\n,,,")) // Duplicated field `a`
             try XCTAssertThrowsError(decoder.decode(Int.self, from: "b,,,d\n,,,")) // Duplicated field ``
@@ -332,7 +352,8 @@ final class CSVCoderTests: XCTestCase {
     }
 
     func testDecoding() throws {
-        try XCTAssertEqual(decoder.decode([Int?].self, from: "0,2\n\"1\",2"), [[1, nil, 2]])
+        try XCTAssertEqual(decoder.decode([Int?].self, from: "0,1,3\n\"1\",2,"), [[1, 2]])
+        try XCTAssertEqual(decoder.decode([Int?].self, from: "a,b,c\n\"1\",2,"), [[]])
         do {
             struct Test: Decodable, Equatable {
                 var a: Int?, b: Int?, c: Int?
@@ -351,50 +372,6 @@ final class CSVCoderTests: XCTestCase {
                 }
             }
             try XCTAssertEqual(decoder.decode(Test.self, from: "0,2\n1,2"), [Test(a: 1, b: nil, c: 2)])
-        }
-    }
-
-    func testSchema() throws {
-        do {
-            let schema: Schema = [.init(value: 2), .init(value: 0)]
-            let string = """
-            a,b,asdf
-            3,5,1
-            """
-            try XCTAssertEqual(decoder.decode([Int].self, from: string, schema: schema), [[1,3]])
-            try XCTAssertEqual(decoder.decode([String: Int].self, from: string, schema: schema), [["0": 1, "1": 3]])
-            try XCTAssertEqual(decoder.decode([Int: Int].self, from: string, schema: schema), [[0: 1, 1: 3]])
-        }
-        do {
-            let schema: Schema = ["1": .init(value: 4), "a": .init(value: 1), "3": .init(value: 0)]
-            let string = """
-            a,b,asdf
-            3,5,1
-            """
-            try XCTAssertEqual(decoder.decode([Int?].self, from: string, schema: schema), [[nil, nil, nil, 3]])
-            try XCTAssertEqual(decoder.decode([String: Int].self, from: string, schema: schema), [["a": 5, "3": 3]])
-        }
-        do {
-            let schema = Schema(value: 0)
-            let string = """
-            1,2,0
-            3,5,1
-            """
-            try XCTAssertEqual(decoder.decode([String: Int].self, from: string), [["1": 3, "2": 5, "0": 1]])
-            try XCTAssertEqual(decoder.decode([Int].self, from: string), [[1, 3, 5]])
-            try XCTAssertThrowsError(decoder.decode([String: Int].self, from: string, schema: schema))
-            try XCTAssertThrowsError(decoder.decode([Int].self, from: string, schema: schema))
-        }
-        do {
-            let schema: Schema<Int> = [:]
-            let string = """
-            1,2,3
-            3,5,5
-            """
-            try XCTAssertEqual(decoder.decode([Int?].self, from: string), [[nil,3,5,5]])
-            try XCTAssertEqual(decoder.decode([Int: Int].self, from: string), [[1: 3, 2: 5, 3: 5]])
-            try XCTAssertEqual(decoder.decode([Int].self, from: string, schema: schema), [[]])
-            try XCTAssertEqual(decoder.decode([Int: Int].self, from: string, schema: schema), [[:]])
         }
     }
 

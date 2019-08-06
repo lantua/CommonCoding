@@ -5,10 +5,6 @@
 //  Created by Natchanon Luangsomboon on 1/8/2562 BE.
 //
 
-import LNTCommonCoder
-
-public typealias CSVSchema = Schema<Int>
-
 public struct CSVEncodingOptions: OptionSet {
     public let rawValue: Int
     public init(rawValue: Int) {
@@ -107,8 +103,8 @@ public struct CSVDecoder {
         self.userInfo = userInfo
     }
     
-    public func decode<S, T>(_ type: T.Type, from string: S, schema: CSVSchema? = nil) throws -> [T] where S: Sequence, S.Element == Character, T: Decodable {
-        var buffer: [String?] = [], schema: CSVSchema! = schema, fieldCount: Int?, results: [T] = []
+    public func decode<S, T>(_ type: T.Type, from string: S) throws -> [T] where S: Sequence, S.Element == Character, T: Decodable {
+        var buffer: [String?] = [], schema: Schema!, fieldCount: Int?, results: [T] = []
         for token in UnescapedCSVTokens(base: string, separator: separator) {
             switch token {
             case let .escaped(string): buffer.append(string)
@@ -128,16 +124,7 @@ public struct CSVDecoder {
                 guard fieldCount != nil else {
                     fieldCount = buffer.count
 
-                    if schema == nil {
-                        var fieldIndices = Trie<Int>()
-                        for (offset, field) in buffer.enumerated() {
-                            let path = field?.split(separator: subheaderSeparator).map(String.init) ?? []
-                            guard fieldIndices.add(offset, to: path) == nil else {
-                                throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Duplicated field \(field ?? "")"))
-                            }
-                        }
-                        schema = try fieldIndices.toSchema()
-                    }
+                    schema = try Schema(data: buffer.enumerated().map { ($0.element?.split(separator: subheaderSeparator) ?? [], $0.offset) })
                     continue
                 }
 

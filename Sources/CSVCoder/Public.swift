@@ -7,6 +7,8 @@
 
 import Common
 
+public typealias CSVSchema = Schema<Int>
+
 public struct CSVEncodingOptions: OptionSet {
     public let rawValue: Int
     public init(rawValue: Int) {
@@ -73,7 +75,7 @@ public struct CSVEncoder {
                     print(header.joined(separator: separator), to: &output)
                 }
             }
-            assert(fieldIndices == currentFieldIndices)
+            assert(currentFieldIndices.allSatisfy { fieldIndices![$0.key] == $0.value })
 
             print(entry.map(escape).joined(separator: separator), to: &output)
         }
@@ -105,8 +107,8 @@ public struct CSVDecoder {
         self.userInfo = userInfo
     }
     
-    public func decode<S, T>(_ type: T.Type, from string: S, schema: Schema<Int>? = nil) throws -> [T] where S: Sequence, S.Element == Character, T: Decodable {
-        var buffer: [String?] = [], schema: Schema! = schema, fieldCount: Int?, results: [T] = []
+    public func decode<S, T>(_ type: T.Type, from string: S, schema: CSVSchema? = nil) throws -> [T] where S: Sequence, S.Element == Character, T: Decodable {
+        var buffer: [String?] = [], schema: CSVSchema! = schema, fieldCount: Int?, results: [T] = []
         for token in UnescapedCSVTokens(base: string, separator: separator) {
             switch token {
             case let .escaped(string): buffer.append(string)
@@ -118,7 +120,7 @@ public struct CSVDecoder {
                 }
 
                 buffer.append(string)
-            case .invalid(let error):
+            case let .invalid(error):
                 throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Invalid CSV format", underlyingError: error))
             case .rowBoundary:
                 defer { buffer.removeAll(keepingCapacity: true) }

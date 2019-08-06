@@ -356,7 +356,7 @@ final class CSVCoderTests: XCTestCase {
 
     func testSchema() throws {
         do {
-            let schema = Schema.unkeyed([.single(2), .single(0)])
+            let schema: Schema = [.init(value: 2), .init(value: 0)]
             let string = """
             a,b,asdf
             3,5,1
@@ -366,7 +366,7 @@ final class CSVCoderTests: XCTestCase {
             try XCTAssertEqual(decoder.decode([Int: Int].self, from: string, schema: schema), [[0: 1, 1: 3]])
         }
         do {
-            let schema = Schema.keyed(["1": .single(4), "a": .single(1), "3": .single(0)])
+            let schema: Schema = ["1": .init(value: 4), "a": .init(value: 1), "3": .init(value: 0)]
             let string = """
             a,b,asdf
             3,5,1
@@ -375,7 +375,7 @@ final class CSVCoderTests: XCTestCase {
             try XCTAssertEqual(decoder.decode([String: Int].self, from: string, schema: schema), [["a": 5, "3": 3]])
         }
         do {
-            let schema = Schema.single(0)
+            let schema = Schema(value: 0)
             let string = """
             1,2,0
             3,5,1
@@ -386,7 +386,7 @@ final class CSVCoderTests: XCTestCase {
             try XCTAssertThrowsError(decoder.decode([Int].self, from: string, schema: schema))
         }
         do {
-            let schema = Schema<Int>.keyed([:])
+            let schema: Schema<Int> = [:]
             let string = """
             1,2,3
             3,5,5
@@ -397,7 +397,7 @@ final class CSVCoderTests: XCTestCase {
             try XCTAssertEqual(decoder.decode([Int: Int].self, from: string, schema: schema), [[:]])
         }
     }
-    
+
     func testNestedKeyedContainers() throws {
         struct KeyedCodable: Codable, Equatable {
             var a: Float, b: String, c: Int, d: Double

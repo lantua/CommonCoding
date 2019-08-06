@@ -44,29 +44,6 @@ extension String {
     }
 }
 
-extension Schema {
-    func getArray() -> [Schema]? {
-        switch self {
-        case let .unkeyed(schemas): return schemas
-        case let .keyed(schemas):
-            let schemas = Dictionary(uniqueKeysWithValues: schemas.compactMap { arg in
-                Int(arg.key).map { ($0, arg.value) }
-            })
-            let keyCount = 1 + (schemas.keys.max() ?? -1)
-            return (0..<keyCount).map { schemas[$0] ?? .noData }
-        default: return nil
-        }
-    }
-
-    func getDictionary() -> [String: Schema]? {
-        switch self {
-        case let .unkeyed(schemas): return Dictionary(uniqueKeysWithValues: zip((0...).lazy.map(String.init), schemas))
-        case let .keyed(schemas): return schemas
-        default: return nil
-        }
-    }
-}
-
 struct UnkeyedCodingKey: CodingKey {
     var index: Int
     

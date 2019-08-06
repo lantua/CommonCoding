@@ -18,8 +18,8 @@ struct DecodingContext {
         self.values = values
     }
     
-    func value<T>(at scope: (Schema<Int>, [CodingKey])) throws -> T where T: LosslessStringConvertible {
-        guard case let .single(index) = scope.0 else {
+    func value<T>(at scope: (CSVSchema, [CodingKey])) throws -> T where T: LosslessStringConvertible {
+        guard let index = scope.0.getValue() else {
             throw DecodingError.typeMismatch(T.self, .init(codingPath: scope.1, debugDescription: "Multi-field object found"))
         }
         guard let string = values[index] else {
@@ -32,16 +32,16 @@ struct DecodingContext {
         return result
     }
 
-    func hasValue(at schema: Schema<Int>) -> Bool {
+    func hasValue(at schema: CSVSchema) -> Bool {
         return schema.contains { values.indices ~= $0 && values[$0] != nil }
     }
 }
 
 struct CSVInternalDecoder: Decoder {
-    let context: DecodingContext, schema: Schema<Int>, codingPath: [CodingKey]
+    let context: DecodingContext, schema: CSVSchema, codingPath: [CodingKey]
     var userInfo: [CodingUserInfoKey: Any] { return context.userInfo }
     
-    init(context: DecodingContext, scope: (Schema<Int>, [CodingKey])) {
+    init(context: DecodingContext, scope: (CSVSchema, [CodingKey])) {
         self.context = context
         (self.schema, self.codingPath) = scope
     }
@@ -60,7 +60,7 @@ struct CSVInternalDecoder: Decoder {
 }
 
 private struct CSVKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainerProtocol {
-    let context: DecodingContext, schemas: [String: Schema<Int>], codingPath: [CodingKey]
+    let context: DecodingContext, schemas: [String: CSVSchema], codingPath: [CodingKey]
     var allKeys: [Key] {
         // Includes only keys with non-nil value.
         //
@@ -70,8 +70,8 @@ private struct CSVKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainer
         return schemas.compactMap { context.hasValue(at: $0.value) ? Key(stringValue: $0.key) : nil }
     }
     
-    init(context: DecodingContext, scope: (Schema<Int>, [CodingKey])) throws {
-        guard let schemas = scope.0.getDictionary() else {
+    init(context: DecodingContext, scope: (CSVSchema, [CodingKey])) throws {
+        guard let schemas = scope.0.getContainer(keyedBy: Key.self) else {
             throw DecodingError.dataCorrupted(.init(codingPath: scope.1, debugDescription: "Only keyed/unkeyed schemas are supported by CSVKeyedDecodingContainer"))
         }
         self.schemas = schemas
@@ -79,7 +79,7 @@ private struct CSVKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainer
         self.codingPath = scope.1
     }
 
-    private func scope(for key: CodingKey) throws -> (Schema<Int>, [CodingKey]) {
+    private func scope(for key: CodingKey) throws -> (CSVSchema, [CodingKey]) {
         guard let schema = schemas[key.stringValue] else {
             throw DecodingError.keyNotFound(key, .init(codingPath: codingPath, debugDescription: ""))
         }
@@ -118,14 +118,14 @@ private struct CSVKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainer
 }
 
 private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
-    let context: DecodingContext, schemas: [Schema<Int>], codingPath: [CodingKey]
+    let context: DecodingContext, schemas: [CSVSchema], codingPath: [CodingKey]
     
     let count: Int?
     var currentIndex = 0
     var isAtEnd: Bool { return currentIndex == count }
 
-    init(context: DecodingContext, scope: (Schema<Int>, [CodingKey])) throws {
-        guard let schemas = scope.0.getArray() else {
+    init(context: DecodingContext, scope: (CSVSchema, [CodingKey])) throws {
+        guard let schemas = scope.0.getUnkeyedContainer() else {
             throw DecodingError.dataCorrupted(.init(codingPath: scope.1, debugDescription: "Only keyed/unkeyed schemas are supported by CSVUnkeyedDecodingContainer"))
         }
         self.schemas = schemas
@@ -134,12 +134,12 @@ private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
         self.codingPath = scope.1
     }
 
-    private mutating func consumeScope() -> (Schema<Int>, [CodingKey]) {
+    private mutating func consumeScope() -> (CSVSchema, [CodingKey]) {
         // We could check against `count` bound, but that would make it impossible to decode `Optional` past
         // the last non-nil value. That's probably not what we want
         defer { currentIndex += 1 }
         guard schemas.indices ~= currentIndex else {
-            return (.noData, codingPath + [UnkeyedCodingKey(intValue: currentIndex)])
+            return (.init(), codingPath + [UnkeyedCodingKey(intValue: currentIndex)])
         }
         return (schemas[currentIndex], codingPath + [UnkeyedCodingKey(intValue: currentIndex)])
     }
@@ -174,9 +174,9 @@ private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
 }
 
 private struct CSVSingleValueDecodingContainer: SingleValueDecodingContainer {
-    let context: DecodingContext, schema: Schema<Int>, codingPath: [CodingKey]
+    let context: DecodingContext, schema: CSVSchema, codingPath: [CodingKey]
 
-    init(context: DecodingContext, scope: (Schema<Int>, [CodingKey])) {
+    init(context: DecodingContext, scope: (CSVSchema, [CodingKey])) {
         self.context = context
         (self.schema, self.codingPath) = scope
     }

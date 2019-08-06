@@ -26,16 +26,16 @@ struct Trie<Value> {
     }
 }
 
-extension Trie {
+extension Trie where Value == Int {
     func toSchema() throws -> Schema<Value> {
         guard value == nil || children.isEmpty else {
             throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Found mixed multi/single field."))
         }
 
         if let value = value {
-            return .single(value)
+            return .init(value: value)
         }
 
-        return try .keyed(children.mapValues { try $0.toSchema() })
+        return try .init(keyed: children.mapValues { try $0.toSchema() })
     }
 }

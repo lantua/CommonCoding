@@ -7,10 +7,6 @@
 
 import Common
 
-struct TmpError: Error {
-
-}
-
 struct DecodingContext {
     private let decoder: CSVDecoder
     var userInfo: [CodingUserInfoKey: Any] { return decoder.userInfo }
@@ -76,7 +72,7 @@ private struct CSVKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainer
     
     init(context: DecodingContext, scope: (Schema<Int>, [CodingKey])) throws {
         guard let schemas = scope.0.getDictionary() else {
-            throw TmpError()
+            throw DecodingError.dataCorrupted(.init(codingPath: scope.1, debugDescription: "Only keyed/unkeyed schemas are supported by CSVKeyedDecodingContainer"))
         }
         self.schemas = schemas
         self.context = context
@@ -130,7 +126,7 @@ private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
 
     init(context: DecodingContext, scope: (Schema<Int>, [CodingKey])) throws {
         guard let schemas = scope.0.getArray() else {
-            throw TmpError()
+            throw DecodingError.dataCorrupted(.init(codingPath: scope.1, debugDescription: "Only keyed/unkeyed schemas are supported by CSVUnkeyedDecodingContainer"))
         }
         self.schemas = schemas
         self.count = 1 + (schemas.lastIndex(where: context.hasValue(at:)) ?? -1)

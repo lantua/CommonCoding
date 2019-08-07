@@ -116,8 +116,7 @@ private struct CSVKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainer
 }
 
 private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
-    let context: DecodingContext, schemas: [Schema?], codingPath: [CodingKey]
-    lazy var emptySchema = Schema()
+    let context: DecodingContext, schemas: [Schema], codingPath: [CodingKey]
     
     let count: Int?
     var currentIndex = 0
@@ -128,21 +127,21 @@ private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
             throw DecodingError.dataCorrupted(.init(codingPath: scope.1, debugDescription: "Expecting multi-field object"))
         }
         self.schemas = schemas
-        self.count = 1 + (schemas.lastIndex { $0.map(context.hasValue(at:)) ?? false } ?? -1)
+        self.count = 1 + (schemas.lastIndex(where: context.hasValue(at:)) ?? -1)
         self.context = context
         self.codingPath = scope.1
     }
 
-    private mutating func consumeScope() -> (Schema, [CodingKey]) {
-        // We could check against `count` bound, but that would make it impossible to decode `Optional` past
-        // the last non-nil value. That's probably not what we want
+    private mutating func consumeScope() throws -> (Schema, [CodingKey]) {
         defer { currentIndex += 1 }
-        let schema = (schemas.indices ~= currentIndex ? schemas[currentIndex] : nil) ?? emptySchema
-        return (schema, codingPath + [UnkeyedCodingKey(intValue: currentIndex)])
+        guard schemas.indices ~= currentIndex else {
+            throw DecodingError.keyNotFound(UnkeyedCodingKey(intValue: currentIndex), .init(codingPath: codingPath, debugDescription: ""))
+        }
+        return (schemas[currentIndex], codingPath + [UnkeyedCodingKey(intValue: currentIndex)])
     }
 
     mutating func decodeNil() throws -> Bool {
-        let hasValue = context.hasValue(at: consumeScope().0)
+        let hasValue = try context.hasValue(at: consumeScope().0)
         if hasValue {
             currentIndex -= 1
         }
@@ -166,7 +165,7 @@ private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     }
     
     mutating func superDecoder() throws -> Decoder {
-        return CSVInternalDecoder(context: context, scope: consumeScope())
+        return try CSVInternalDecoder(context: context, scope: consumeScope())
     }
 }
 

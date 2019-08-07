@@ -11,9 +11,8 @@ final class Schema {
     }
     let raw: Raw
 
-    var keyedCache: [ObjectIdentifier: [String: Schema]] = [:], unkeyedCache: [Schema?]?
+    var keyedCache: [ObjectIdentifier: [String: Schema]] = [:], unkeyedCache: [Schema]?
 
-    init() { raw = .nested([:]) }
     init<A>(data: [(path: A, index: Int)]) throws where A: Collection, A.Element: StringProtocol {
         // By constrution, `data` can not be empty at non-top level.
         // `data` can not be empty at top-level either as tokenizer
@@ -57,13 +56,19 @@ final class Schema {
         return cache
     }
 
-    func getUnkeyedContainer() -> [Schema?]? {
+    func getUnkeyedContainer() -> [Schema]? {
         guard let cache = unkeyedCache else {
             guard case let .nested(data) = raw else {
                 return nil
             }
-            let count = 1 + (data.keys.compactMap(Int.init).max() ?? -1)
-            let result = (0..<count).map { data[String($0)] }
+            var result: [Schema] = []
+            for i in 0..<data.count {
+                guard let schema = data[String(i)] else {
+                    break
+                }
+                result.append(schema)
+            }
+
             unkeyedCache = result
             return result
         }

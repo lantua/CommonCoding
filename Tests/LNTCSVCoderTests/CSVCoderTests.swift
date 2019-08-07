@@ -227,7 +227,7 @@ final class CSVCoderTests: XCTestCase {
 
         do { // Statically call decode(_:), decodeIfPresent(_:)
             struct Test: Codable, Equatable {
-                var s: String, b: Bool?, c: Int?, d: Double?
+                var s: String, b: Bool?, c: Int?
 
                 init(s: String, b: Bool?) {
                     self.s = s
@@ -239,7 +239,6 @@ final class CSVCoderTests: XCTestCase {
                     s = try container.decode(String.self)
                     b = try container.decodeIfPresent(Bool.self)
                     c = try container.decode(Int?.self)
-                    d = try container.decodeIfPresent(Double.self)
                 }
 
                 func encode(to encoder: Encoder) throws {
@@ -261,12 +260,12 @@ final class CSVCoderTests: XCTestCase {
         }
 
         do { // Interesting interaction between Dictionary and Array
-            let dictionary = [1: "test", 3: "some"]
-            let array = [nil, "test", nil, "some"]
+            let dictionary = [0: "test", 3: "some"]
+            let array = ["test", nil, nil, "some"]
 
             try XCTAssertEqual(decoder.decode([Int: String].self, from: encoder.encode([dictionary])), [dictionary])
             try XCTAssertEqual(decoder.decode([Int: String].self, from: encoder.encode([array])), [dictionary])
-            try XCTAssertEqual(decoder.decode([String?].self, from: encoder.encode([dictionary])), [array])
+            try XCTAssertEqual(decoder.decode([String?].self, from: encoder.encode([dictionary])), [["test"]])
             try XCTAssertEqual(decoder.decode([String?].self, from: encoder.encode([array])), [array])
         }
 
@@ -340,8 +339,8 @@ final class CSVCoderTests: XCTestCase {
                 var a: [Int?], d: [Int: String]
             }
             try XCTAssertThrowsError(decoder.decode(Test.self, from: "a,d.1\n3,sdf")) // Complex as simple object
-            try XCTAssertThrowsError(decoder.decode(Test.self, from: "a.1,d\n3,sdf")) // Complex as simple object
-            try XCTAssertEqual(decoder.decode(Test.self, from: "a.1,d.1\n3,sdf"), [Test(a: [nil, 3], d: [1: "sdf"])])
+            try XCTAssertThrowsError(decoder.decode(Test.self, from: "a.0,d\n3,sdf")) // Complex as simple object
+            try XCTAssertEqual(decoder.decode(Test.self, from: "a.0,d.1\n3,sdf"), [Test(a: [3], d: [1: "sdf"])])
         }
         do {
             try XCTAssertThrowsError(decoder.decode(Int.self, from: "\n1\n7,")) // Unequal rows
@@ -371,7 +370,7 @@ final class CSVCoderTests: XCTestCase {
                     c = try container.decodeIfPresent(Int.self)
                 }
             }
-            try XCTAssertEqual(decoder.decode(Test.self, from: "0,2\n1,2"), [Test(a: 1, b: nil, c: 2)])
+            try XCTAssertEqual(decoder.decode(Test.self, from: "0,2,1\n1,2,"), [Test(a: 1, b: nil, c: 2)])
         }
     }
 

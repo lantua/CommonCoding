@@ -65,7 +65,7 @@ private struct CSVKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainer
         // Decodables that uses this is usually dynamic, so `nil` fields would be used
         // to mark the absence of key. If the key definitely must be present, it's usually
         // hard-coded in the generated/user-defined `init(from:)` and bypass this value anyway.
-        return schemas.compactMap { context.hasValue(at: $0.value) ? Key(stringValue: $0.key) : nil }
+        return schemas.filter { context.hasValue(at: $0.value) }.map { Key(stringValue: $0.key)! }
     }
     
     init(context: DecodingContext, scope: (Schema, [CodingKey])) throws {

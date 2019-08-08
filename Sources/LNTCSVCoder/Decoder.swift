@@ -41,7 +41,7 @@ struct CSVInternalDecoder: Decoder {
     
     init(context: DecodingContext, scope: (Schema, [CodingKey])) {
         self.context = context
-        (self.schema, self.codingPath) = scope
+        (schema, codingPath) = scope
     }
     
     func container<Key>(keyedBy type: Key.Type) throws -> KeyedDecodingContainer<Key> where Key: CodingKey {
@@ -127,7 +127,7 @@ private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
             throw DecodingError.dataCorrupted(.init(codingPath: scope.1, debugDescription: "Expecting multi-field object"))
         }
         self.schemas = schemas
-        self.count = 1 + (schemas.lastIndex(where: context.hasValue(at:)) ?? -1)
+        self.count = 1 + (schemas.lastIndex(where: context.hasValue) ?? -1)
         self.context = context
         self.codingPath = scope.1
     }

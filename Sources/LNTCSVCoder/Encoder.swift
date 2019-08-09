@@ -102,15 +102,6 @@ private struct CSVKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingContainer
         return CSVUnkeyedEncodingContainer(context: context, codingPath: codingPath(forKey: key))
     }
 
-    
-    mutating func encodeIfPresent(_ value: String?, forKey key: Key) throws {
-        guard let value = value else {
-            try encodeNil(forKey: key)
-            return
-        }
-        try encode(value, forKey: key)
-    }
-
     mutating func encodeIfPresent(_ value: Bool?, forKey key: Key) throws { try encodeIfPresent(value.map(String.init), forKey: key) }
     mutating func encodeIfPresent(_ value: Double?, forKey key: Key) throws { try encodeIfPresent(value.map(String.init(_:)), forKey: key) }
     mutating func encodeIfPresent(_ value: Float?, forKey key: Key) throws { try encodeIfPresent(value.map(String.init(_:)), forKey: key) }
@@ -124,6 +115,9 @@ private struct CSVKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingContainer
     mutating func encodeIfPresent(_ value: UInt16?, forKey key: Key) throws { try encodeIfPresent(value.map(String.init), forKey: key) }
     mutating func encodeIfPresent(_ value: UInt32?, forKey key: Key) throws { try encodeIfPresent(value.map(String.init), forKey: key) }
     mutating func encodeIfPresent(_ value: UInt64?, forKey key: Key) throws { try encodeIfPresent(value.map(String.init), forKey: key) }
+    mutating func encodeIfPresent(_ value: String?, forKey key: Key) throws {
+        try value != nil ? encode(value!, forKey: key) : encodeNil(forKey: key)
+    }
 }
 
 private struct CSVUnkeyedEncodingContainer: UnkeyedEncodingContainer {

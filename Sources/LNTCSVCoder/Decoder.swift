@@ -7,9 +7,9 @@
 
 struct DecodingContext {
     private let decoder: CSVDecoder
-    var userInfo: [CodingUserInfoKey: Any] { return decoder.userInfo }
-    
     private let values: [String?]
+
+    var userInfo: [CodingUserInfoKey: Any] { return decoder.userInfo }
 
     init(decoder: CSVDecoder, values: [String?]) {
         self.decoder = decoder
@@ -37,7 +37,9 @@ struct DecodingContext {
 
 struct CSVInternalDecoder: Decoder {
     let context: DecodingContext, schema: Schema, codingPath: [CodingKey]
+
     var userInfo: [CodingUserInfoKey: Any] { return context.userInfo }
+    var scope: (Schema, [CodingKey]) { return (schema, codingPath) }
     
     init(context: DecodingContext, scope: (Schema, [CodingKey])) {
         self.context = context
@@ -45,20 +47,21 @@ struct CSVInternalDecoder: Decoder {
     }
     
     func container<Key>(keyedBy type: Key.Type) throws -> KeyedDecodingContainer<Key> where Key: CodingKey {
-        return try KeyedDecodingContainer(CSVKeyedDecodingContainer(context: context, scope: (schema, codingPath)))
+        return try KeyedDecodingContainer(CSVKeyedDecodingContainer(context: context, scope: scope))
     }
     
     func unkeyedContainer() throws -> UnkeyedDecodingContainer {
-        return try CSVUnkeyedDecodingContainer(context: context, scope: (schema, codingPath))
+        return try CSVUnkeyedDecodingContainer(context: context, scope: scope)
     }
     
     func singleValueContainer() throws -> SingleValueDecodingContainer {
-        return CSVSingleValueDecodingContainer(context: context, scope: (schema, codingPath))
+        return CSVSingleValueDecodingContainer(context: context, scope: scope)
     }
 }
 
 private struct CSVKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainerProtocol {
     let context: DecodingContext, schemas: [String: Schema], codingPath: [CodingKey]
+
     var allKeys: [Key] {
         // Includes only keys with non-nil value.
         //
@@ -98,10 +101,7 @@ private struct CSVKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainer
         return try context.value(at: scope(forKey: key))
     }
 
-    func decode<T>(_ type: T.Type, forKey key: Key) throws -> T where T: Decodable {
-        return try .init(from: decoder(forKey: key))
-    }
-
+    func decode<T>(_ type: T.Type, forKey key: Key) throws -> T where T: Decodable { return try .init(from: decoder(forKey: key)) }
     func superDecoder() throws -> Decoder { return try decoder(forKey: SuperCodingKey()) }
     func superDecoder(forKey key: Key) throws -> Decoder { return try decoder(forKey: key) }
     
@@ -165,11 +165,12 @@ private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     mutating func nestedUnkeyedContainer() throws -> UnkeyedDecodingContainer {
         return try CSVUnkeyedDecodingContainer(context: context, scope: consumeScope())
     }
-    
 }
 
 private struct CSVSingleValueDecodingContainer: SingleValueDecodingContainer {
     let context: DecodingContext, schema: Schema, codingPath: [CodingKey]
+
+    var scope: (Schema, [CodingKey]) { return (schema, codingPath) }
 
     init(context: DecodingContext, scope: (Schema, [CodingKey])) {
         self.context = context
@@ -179,10 +180,10 @@ private struct CSVSingleValueDecodingContainer: SingleValueDecodingContainer {
     func decodeNil() -> Bool { return !context.hasValue(at: schema) }
 
     func decode<T>(_ type: T.Type) throws -> T where T: Decodable, T: LosslessStringConvertible {
-        return try context.value(at: (schema, codingPath))
+        return try context.value(at: scope)
     }
     
     func decode<T>(_ type: T.Type) throws -> T where T: Decodable {
-        return try .init(from: CSVInternalDecoder(context: context, scope: (schema, codingPath)))
+        return try .init(from: CSVInternalDecoder(context: context, scope: scope))
     }
 }

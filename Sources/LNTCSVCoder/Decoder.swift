@@ -77,41 +77,40 @@ private struct CSVKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainer
         self.codingPath = scope.1
     }
 
-    private func scope(for key: CodingKey) throws -> (Schema, [CodingKey]) {
+    private func scope(forKey key: CodingKey) throws -> (Schema, [CodingKey]) {
         guard let schema = schemas[key.stringValue] else {
             throw DecodingError.keyNotFound(key, .init(codingPath: codingPath, debugDescription: ""))
         }
         return (schema, codingPath + [key])
     }
+
+    private func decoder(forKey key: CodingKey) throws -> Decoder {
+        return try CSVInternalDecoder(context: context, scope: scope(forKey: key))
+    }
     
     func contains(_ key: Key) -> Bool { return schemas[key.stringValue] != nil }
     
     func decodeNil(forKey key: Key) throws -> Bool {
-        return try !context.hasValue(at: scope(for: key).0)
+        return try !context.hasValue(at: scope(forKey: key).0)
     }
 
     func decode<T>(_ type: T.Type, forKey key: Key) throws -> T where T: Decodable, T: LosslessStringConvertible {
-        return try context.value(at: scope(for: key))
+        return try context.value(at: scope(forKey: key))
     }
 
     func decode<T>(_ type: T.Type, forKey key: Key) throws -> T where T: Decodable {
-        return try .init(from: CSVInternalDecoder(context: context, scope: scope(for: key)))
+        return try .init(from: decoder(forKey: key))
     }
+
+    func superDecoder() throws -> Decoder { return try decoder(forKey: SuperCodingKey()) }
+    func superDecoder(forKey key: Key) throws -> Decoder { return try decoder(forKey: key) }
     
     func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type, forKey key: Key) throws -> KeyedDecodingContainer<NestedKey> where NestedKey: CodingKey {
-        return try .init(CSVKeyedDecodingContainer<NestedKey>(context: context, scope: scope(for: key)))
+        return try .init(CSVKeyedDecodingContainer<NestedKey>(context: context, scope: scope(forKey: key)))
     }
     
     func nestedUnkeyedContainer(forKey key: Key) throws -> UnkeyedDecodingContainer {
-        return try CSVUnkeyedDecodingContainer(context: context, scope: scope(for: key))
-    }
-    
-    func superDecoder() throws -> Decoder {
-        return try CSVInternalDecoder(context: context, scope: scope(for: SuperCodingKey()))
-    }
-    
-    func superDecoder(forKey key: Key) throws -> Decoder {
-        return try CSVInternalDecoder(context: context, scope: scope(for: key))
+        return try CSVUnkeyedDecodingContainer(context: context, scope: scope(forKey: key))
     }
 }
 
@@ -140,6 +139,10 @@ private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
         return (schemas[currentIndex], codingPath + [UnkeyedCodingKey(intValue: currentIndex)])
     }
 
+    private mutating func consumeDecoder() throws -> Decoder {
+        return try CSVInternalDecoder(context: context, scope: consumeScope())
+    }
+
     mutating func decodeNil() throws -> Bool {
         let hasValue = try context.hasValue(at: consumeScope().0)
         if hasValue {
@@ -152,10 +155,9 @@ private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
         return try context.value(at: consumeScope())
     }
     
-    mutating func decode<T>(_ type: T.Type) throws -> T where T: Decodable {
-        return try .init(from: CSVInternalDecoder(context: context, scope: consumeScope()))
-    }
-    
+    mutating func decode<T>(_ type: T.Type) throws -> T where T: Decodable { return try .init(from: consumeDecoder()) }
+    mutating func superDecoder() throws -> Decoder { return try consumeDecoder() }
+
     mutating func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type) throws -> KeyedDecodingContainer<NestedKey> where NestedKey: CodingKey {
         return try .init(CSVKeyedDecodingContainer(context: context, scope: consumeScope()))
     }
@@ -164,9 +166,6 @@ private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
         return try CSVUnkeyedDecodingContainer(context: context, scope: consumeScope())
     }
     
-    mutating func superDecoder() throws -> Decoder {
-        return try CSVInternalDecoder(context: context, scope: consumeScope())
-    }
 }
 
 private struct CSVSingleValueDecodingContainer: SingleValueDecodingContainer {

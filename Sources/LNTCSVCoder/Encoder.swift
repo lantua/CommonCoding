@@ -76,36 +76,33 @@ struct CSVInternalEncoder: Encoder {
 private struct CSVKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingContainerProtocol {
     let context: EncodingContext, codingPath: [CodingKey]
     
-    private func codingPath(for key: CodingKey) -> [CodingKey] {
+    private func codingPath(forKey key: CodingKey) -> [CodingKey] {
         return codingPath + [key]
     }
 
-    mutating func encodeNil(forKey key: Key) throws { try context.add(unescaped: nil, to: codingPath(for: key)) }
+    private func encoder(forKey key: CodingKey) -> Encoder {
+        return CSVInternalEncoder(context: context, codingPath: codingPath(forKey: key))
+    }
+
+    mutating func encodeNil(forKey key: Key) throws { try context.add(unescaped: nil, to: codingPath(forKey: key)) }
 
     mutating func encode<T>(_ value: T, forKey key: Key) throws where T: Encodable, T: LosslessStringConvertible {
-        try context.add(unescaped: String(value), to: codingPath(for: key))
+        try context.add(unescaped: String(value), to: codingPath(forKey: key))
     }
 
-    mutating func encode<T>(_ value: T, forKey key: Key) throws where T: Encodable {
-        try value.encode(to: CSVInternalEncoder(context: context, codingPath: codingPath(for: key)))
-    }
+    mutating func encode<T>(_ value: T, forKey key: Key) throws where T: Encodable { try value.encode(to: encoder(forKey: key)) }
+    mutating func superEncoder() -> Encoder { return encoder(forKey: SuperCodingKey()) }
+    mutating func superEncoder(forKey key: Key) -> Encoder { return encoder(forKey: key) }
 
     mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> where NestedKey: CodingKey {
-        return KeyedEncodingContainer(CSVKeyedEncodingContainer<NestedKey>(context: context, codingPath: codingPath(for: key)))
+        return KeyedEncodingContainer(CSVKeyedEncodingContainer<NestedKey>(context: context, codingPath: codingPath(forKey: key)))
     }
     
     mutating func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer {
-        return CSVUnkeyedEncodingContainer(context: context, codingPath: codingPath(for: key))
-    }
-    
-    mutating func superEncoder() -> Encoder {
-        return CSVInternalEncoder(context: context, codingPath: codingPath(for: SuperCodingKey()))
-    }
-    
-    mutating func superEncoder(forKey key: Key) -> Encoder {
-        return CSVInternalEncoder(context: context, codingPath: codingPath(for: key))
+        return CSVUnkeyedEncodingContainer(context: context, codingPath: codingPath(forKey: key))
     }
 
+    
     mutating func encodeIfPresent(_ value: String?, forKey key: Key) throws {
         guard let value = value else {
             try encodeNil(forKey: key)
@@ -142,6 +139,10 @@ private struct CSVUnkeyedEncodingContainer: UnkeyedEncodingContainer {
         defer { count += 1 }
         return codingPath + [UnkeyedCodingKey(intValue: count)]
     }
+
+    private mutating func consumeEncoder() -> Encoder {
+        return CSVInternalEncoder(context: context, codingPath: consumeCodingPath())
+    }
     
     mutating func encodeNil() throws { try context.add(unescaped: nil, to: consumeCodingPath()) }
 
@@ -149,20 +150,15 @@ private struct CSVUnkeyedEncodingContainer: UnkeyedEncodingContainer {
         try context.add(unescaped: String(value), to: consumeCodingPath())
     }
 
-    mutating func encode<T>(_ value: T) throws where T: Encodable {
-        try value.encode(to: CSVInternalEncoder(context: context, codingPath: consumeCodingPath()))
-    }
-    
+    mutating func encode<T>(_ value: T) throws where T: Encodable { try value.encode(to: consumeEncoder()) }
+    mutating func superEncoder() -> Encoder { return consumeEncoder() }
+
     mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> where NestedKey: CodingKey {
         return KeyedEncodingContainer(CSVKeyedEncodingContainer(context: context, codingPath: consumeCodingPath()))
     }
     
     mutating func nestedUnkeyedContainer() -> UnkeyedEncodingContainer {
         return CSVUnkeyedEncodingContainer(context: context, codingPath: consumeCodingPath())
-    }
-    
-    mutating func superEncoder() -> Encoder {
-        return CSVInternalEncoder(context: context, codingPath: consumeCodingPath())
     }
 }
 

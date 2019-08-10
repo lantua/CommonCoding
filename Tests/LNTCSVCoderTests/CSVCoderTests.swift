@@ -178,7 +178,7 @@ final class CSVCoderTests: XCTestCase {
         }
     }
 
-    func testSingleRoundtrip() throws {
+    func testSingleValueRoundtrip() throws {
         let values = [144, nil]
         try XCTAssertEqual(decoder.decode(Int?.self, from: encoder.encode(values)), values)
     }
@@ -468,7 +468,7 @@ final class CSVCoderTests: XCTestCase {
         ("testCodingKeys", testCodingKeys),
         ("testRoundtrip", testRoundtrip),
 
-        ("testSingleRoundtrip", testSingleRoundtrip),
+        ("testSingleValueRoundtrip", testSingleValueRoundtrip),
         ("testKeyedRoundtrip", testKeyedRoundtrip),
         ("testUnkeyedRoundtrip", testUnkeyedRoundtrip),
 

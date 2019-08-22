@@ -146,7 +146,7 @@ final class CSVCoderTests: XCTestCase {
     func testRoundtrip() {
         do {
             let value1: Int? = nil
-            let encoder = CSVEncoder(options: .useNullasNil)
+            let encoder = CSVEncoder(options: .useNullAsNil)
             let decoder = CSVDecoder(options: .treatNullAsNil)
             try XCTAssertEqual(decoder.decode(Int?.self, from: encoder.encode([value1])), [value1])
 
@@ -460,6 +460,38 @@ final class CSVCoderTests: XCTestCase {
 
         let values = UnkeyedCodable(a: 0.0, b: "test", c: -33)
         try XCTAssertEqual(decoder.decode(UnkeyedCodable.self, from: encoder.encode([values])), [values])
+    }
+
+    func testReadme() throws {
+        struct SomeStruct: Equatable, Codable {
+            var a: Int, b: Double?, c: String
+        }
+        struct OtherStruct: Equatable, Codable {
+            var float: Float?, some: SomeStruct
+        }
+
+        do {
+            let values = [
+                OtherStruct(float: 5.5, some: .init(a: 4, b: .infinity, c: "abc")),
+                OtherStruct(float: nil, some: .init(a: -3, b: nil, c: ""))
+            ]
+
+            let string = try encoder.encode(values)
+            print(string)
+        }
+        do {
+            let string = """
+            a,b,c
+            4,,test
+            6,9.9,ss
+            """
+
+            let value = try decoder.decode(SomeStruct.self, from: string)
+            XCTAssertEqual(value, [
+                SomeStruct(a: 4, b: nil, c: "test"),
+                SomeStruct(a: 6, b: 9.9, c: "ss")
+                ])
+        }
     }
 
     static var allTests = [

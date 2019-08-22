@@ -16,7 +16,7 @@ public struct CSVEncodingOptions: OptionSet {
     /// Force escape every value
     public static let alwaysQuote       = CSVEncodingOptions(rawValue: 1 << 1)
     /// Use unescaped "null" as nil value
-    public static let useNullasNil      = CSVEncodingOptions(rawValue: 1 << 2)
+    public static let useNullAsNil      = CSVEncodingOptions(rawValue: 1 << 2)
 }
 
 public struct CSVEncoder {
@@ -34,8 +34,8 @@ public struct CSVEncoder {
 
     private func escape(_ string: String?) -> String {
         switch string {
-        case nil: return options.contains(.useNullasNil) ? "null" : ""
-        case "null" where options.contains(.useNullasNil): return "\"null\""
+        case nil: return options.contains(.useNullAsNil) ? "null" : ""
+        case "null" where options.contains(.useNullAsNil): return "\"null\""
         case let string?:
             return string.escaped(separator: separator, forced: options.contains(.alwaysQuote))
         }

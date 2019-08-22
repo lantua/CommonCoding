@@ -4,7 +4,7 @@ Common Swift Encoder/Decoder
 
 ## CSV Coders
 
-Encoder and decoder for `csv` file format as per [RFC 4180](https://tools.ietf.org/html/rfc4180)
+Encoder and decoder for CSV file format as per [RFC 4180](https://tools.ietf.org/html/rfc4180)
 
 A decoding example,
 
@@ -64,13 +64,13 @@ Note that both times the Swift data is a sequence of values. This is due to tabu
 
 ### Header structure
 
-CSV coders require the csv string to contains header.
+CSV coders require the CSV string to contains header.
 * Header field for elements in `KeyedContainer` is the `stringValue` of the `key` used to encode/decode data.
 * Header field for elements in `UnkeyedContainer` is the offset (converted to `String`) from the beginning of the container `0, 1, 2, ...`.
-* Nested containers will use `subheaderSeparator` (defaulted to ".") to separated between outer header name and inner header name. Thus every subfield must not contain `subheaderSeparator`.
+* Nested containers will use `subheaderSeparator` (defaulted to `.`) to separated between subfields at each level. Thus every subfield must not contain `subheaderSeparator`.
 * Super encoder uses `super` as a subfield if none is provided.
 
-Thus the following structure
+As such, the following structure
 
 ```
 class A: Codable {
@@ -108,11 +108,11 @@ Note that everything EXCEPT `separator` and `subheaderSeparator` can be changed 
 public func encode<S>(_ values: S) throws -> String where S: Sequence, S.Element: Encodable
 ```
 
-* Encode `values` into `csv` string data.
+* Encode `values` into CSV string data.
 
 * `values`: `Sequence` of values to encode.
 
-* return value: `String` of the encoded `csv` data.
+* return value: `String` of the encoded CSV data.
 * throws `EncodingError` with the following descriptions:
   * _Key does not match any header fields_: if a new key is used after encoder encoded the first item (and finalized the header line).
   * _Duplicated field_: if the same field is encoded twice.
@@ -152,7 +152,7 @@ public func decode<S, T>(_ type: T.Type, from string: S) throws -> [T] where S: 
 * Decode an array of type `T` from `string`
 
 * `type`: type to the decoded data.
-* `string`: csv data to decode.
+* `string`: CSV data to decode.
 
 * `throws`
   * `DecodingError.dataCorrupted` _Expecting multi-field object_: if the decoder found unnested data (`a`), but is expecting a nested data (`a.a`, `a.b`, etc). 

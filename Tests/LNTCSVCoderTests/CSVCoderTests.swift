@@ -509,6 +509,8 @@ final class CSVCoderTests: XCTestCase {
 
         ("testNestedKeyedContainers", testNestedKeyedContainers),
         ("testNestedUnkeyedContainer", testNestedUnkeyedContainer),
+
+        ("testReadme", testReadme),
     ]
 }
 

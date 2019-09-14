@@ -13,24 +13,24 @@ final class Schema {
 
     var keyedCache: [ObjectIdentifier: [String: Schema]] = [:], unkeyedCache: [Schema]?
 
-    init<A>(data: [(path: A, index: Int)]) throws where A: Collection, A.Element: StringProtocol {
+    init(data: [(offset: Int, element: Array<Substring>.SubSequence)]) throws {
         // By constrution, `data` can not be empty at non-top level.
         // `data` can not be empty at top-level either as tokenizer
         // always emit at least one element at the beginning.
         assert(!data.isEmpty)
 
-        guard data.allSatisfy({ !$0.path.isEmpty }) else {
-            if data.contains(where: { !$0.path.isEmpty }) {
+        guard data.allSatisfy({ !$0.element.isEmpty }) else {
+            if data.contains(where: { !$0.element.isEmpty }) {
                 throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Mixed multi/single-field entry found"))
             }
             if data.count > 1 {
                 throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Duplicated fields"))
             }
-            raw = .value(data.first!.index)
+            raw = .value(data.first!.offset)
             return
         }
-        let groupped: [String: Schema] = try Dictionary(grouping: data) { String($0.path.first!) }.mapValues {
-            try Schema(data: $0.map { ($0.path.dropFirst(), $0.index) })
+        let groupped: [String: Schema] = try Dictionary(grouping: data) { String($0.element.first!) }.mapValues {
+            try Schema(data: $0.map { ($0.offset, $0.element.dropFirst()) })
         }
         raw = .nested(groupped)
     }

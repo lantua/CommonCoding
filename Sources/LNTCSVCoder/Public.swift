@@ -124,7 +124,9 @@ public struct CSVDecoder {
                 guard fieldCount != nil else {
                     fieldCount = buffer.count
 
-                    schema = try Schema(data: buffer.enumerated().map { ($0.element?.split(separator: subheaderSeparator) ?? [], $0.offset) })
+                    schema = try Schema(data: Array(buffer.map {
+                        ($0?.split(separator: subheaderSeparator) ?? [])[...]
+                        }.enumerated()))
                     continue
                 }
 

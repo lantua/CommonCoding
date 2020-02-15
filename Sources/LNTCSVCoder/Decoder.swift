@@ -5,8 +5,10 @@
 //  Created by Natchanon Luangsomboon on 1/8/2562 BE.
 //
 
+/// Decoding context, shared between all internal decoders, containers, etc. during single-element decoding process.
 struct DecodingContext {
     private let decoder: CSVDecoder
+    /// Field values, sorted by column.
     private let values: [String?]
 
     var userInfo: [CodingUserInfoKey: Any] { return decoder.userInfo }
@@ -15,7 +17,8 @@ struct DecodingContext {
         self.decoder = decoder
         self.values = values
     }
-    
+
+    /// Returns value at given (schema, coding path), converted to type `T`.
     func value<T>(at scope: (Schema, [CodingKey])) throws -> T where T: LosslessStringConvertible {
         guard let index = scope.0.getValue() else {
             throw DecodingError.typeMismatch(T.self, .init(codingPath: scope.1, debugDescription: "Multi-field object found"))
@@ -35,6 +38,7 @@ struct DecodingContext {
     }
 }
 
+/// Internal decoder. This is what the `Decodable` uses when decoding
 struct CSVInternalDecoder: Decoder {
     let context: DecodingContext, schema: Schema, codingPath: [CodingKey]
 

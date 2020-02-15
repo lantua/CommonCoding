@@ -5,6 +5,7 @@
 //  Created by Natchanon Luangsomboon on 31/7/2562 BE.
 //
 
+/// Encoding context, shared between all internal encoders, containers, etc. during single-element encoding process.
 class EncodingContext {
     private let encoder: CSVEncoder, isFixed: Bool
     private var fieldIndices: [String: Int], values: [String??]
@@ -18,7 +19,8 @@ class EncodingContext {
         isFixed = fieldIndices != nil
         values = Array(repeating: nil, count: (fieldIndices?.count ?? 0))
     }
-    
+
+    /// Add unescaped string at `codingPath`.
     func add(unescaped: String?, to codingPath: [CodingKey]) throws {
         if isFixed {
             guard let index = fieldIndices[encoder.field(for: codingPath)] else {
@@ -55,6 +57,7 @@ class EncodingContext {
     }
 }
 
+/// Internal decoder. This is what the `Decodable` uses when decoding
 struct CSVInternalEncoder: Encoder {
     let context: EncodingContext, codingPath: [CodingKey]
     

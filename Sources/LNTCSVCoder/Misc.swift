@@ -6,6 +6,7 @@
 //
 
 extension String {
+    /// Returns escaped string (including double quote) as necessary.
     func escaped(separator: Character, forced: Bool) -> String {
         func needEscaping(_ character: Character) -> Bool {
             guard character != separator,
@@ -42,6 +43,7 @@ extension String {
     }
 }
 
+/// Coding key for UnkeyedEn/DecodingContainer.
 struct UnkeyedCodingKey: CodingKey {
     var index: Int
     
@@ -59,6 +61,7 @@ struct UnkeyedCodingKey: CodingKey {
     }
 }
 
+/// Coding key for `super` encoder.
 struct SuperCodingKey: CodingKey {
     var intValue: Int? { return 0 }
     var stringValue: String { return "super" }

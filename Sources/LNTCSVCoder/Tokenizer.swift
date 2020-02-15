@@ -5,6 +5,8 @@
 //  Created by Natchanon Luangsomboon on 5/8/2562 BE.
 //
 
+/// Sequence of tokens given the csv content. The tokens may be de-escaped
+/// string (with escaping information), row boundary, and parsing error.
 struct UnescapedCSVTokens<S: Sequence>: Sequence where S.Element == Character {
     let base: S, separator: Character
 
@@ -21,7 +23,7 @@ struct UnescapedCSVTokens<S: Sequence>: Sequence where S.Element == Character {
         case unclosedQoute
     }
 
-    /// Sequence of token, and whether or not boundary is
+    /// Sequence of de-escaped string (with escaping information), and whether or not boundary is right after the said string.
     /// - Attention: Do NOT call `next` after it returns (.invalid, _)
     private struct StatelessIterator: IteratorProtocol {
         let separator: Character

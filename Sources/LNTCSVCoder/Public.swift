@@ -41,6 +41,7 @@ public struct CSVEncoder {
         }
     }
 
+    /// Returns field name at given `codingPath`
     func field(for codingPath: [CodingKey]) -> String {
         return codingPath.map { $0.stringValue }.joined(separator: subheaderSeparator)
     }

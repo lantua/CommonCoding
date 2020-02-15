@@ -5,6 +5,7 @@
 //  Created by Natchanon Luangsomboon on 1/8/2562 BE.
 //
 
+/// Schema of the current object. Contains a single index (for simple types), or key-schema dictionary (for complex types).
 final class Schema {
     enum Raw {
         case value(Int), nested([String: Schema])
@@ -35,6 +36,7 @@ final class Schema {
         raw = .nested(groupped)
     }
 
+    /// Returns `true` if any index in the schema matches `predicate`.
     func contains(where predicate: (Int) throws -> Bool) rethrows -> Bool {
         switch raw {
         case let .value(data): return try predicate(data)

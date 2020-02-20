@@ -5,6 +5,21 @@
 //  Created by Natchanon Luangsomboon on 5/8/2562 BE.
 //
 
+import Foundation
+
+enum CodingPath {
+    case root
+    indirect case child(key: CodingKey, parent: CodingPath)
+
+    var codingPath: [CodingKey] {
+        switch self {
+        case .root: return []
+        case let .child(key: key, parent: parent):
+            return parent.codingPath + CollectionOfOne(key)
+        }
+    }
+}
+
 struct UnkeyedCodingKey: CodingKey {
     var index: Int
 

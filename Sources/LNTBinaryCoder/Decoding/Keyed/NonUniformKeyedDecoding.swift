@@ -42,7 +42,7 @@ struct NonUniformKeyedDecodingContainer<Key>: CommonKeyedDecodingContainer where
 }
 
 extension NonUniformKeyedDecodingContainer {
-    func header(forKey key: CodingKey) throws -> HeaderData {
+    func block(forKey key: CodingKey) throws -> HeaderData {
         guard let data = list[key.stringValue] else {
             throw DecodingError.keyNotFound(key, context.error())
         }

@@ -7,16 +7,16 @@
 
 import Foundation
 
-class UnkeyedEncodingStorage: TemporaryEncodingStorage {
+class TempUnkeyedStorage: TemporaryEncodingStorage {
     var values: [TemporaryEncodingStorage] = []
 
     func finalize() -> EncodingStorage {
-        UnkeyedOptimizableStorage(values: values.map { $0.finalize() })
+        UnkeyedStorage(values: values.map { $0.finalize() })
     }
 }
 
 struct UnkeyedBinaryEncodingContainer: UnkeyedEncodingContainer {
-    let storage: UnkeyedEncodingStorage, context: EncodingContext
+    let storage: TempUnkeyedStorage, context: EncodingContext
 
     var codingPath: [CodingKey] { context.codingPath }
     var count: Int { storage.values.count }
@@ -27,7 +27,7 @@ struct UnkeyedBinaryEncodingContainer: UnkeyedEncodingContainer {
         return value
     }
 
-    mutating func encodeNil() throws { storage.values.append(NilOptimizableStorage()) }
+    mutating func encodeNil() throws { storage.values.append(NilStorage()) }
 
     mutating func encode<T>(_ value: T) throws where T: Encodable {
         try value.encode(to: InternalEncoder(storage: register(.init()), context: context.appending(UnkeyedCodingKey(intValue: count))))

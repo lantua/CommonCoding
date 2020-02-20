@@ -27,9 +27,9 @@ func uniformize<C>(values: C) -> (elementSize: Int, header: Header)? where C: Co
     for value in values {
         var current: Header.Tag
         switch value {
-        case is NilOptimizableStorage: current = .nil
-        case is FixedWidthOptimizableStorage: current = .fixedWidth
-        case is StringOptimizableStorage: current = .stringReference
+        case is NilStorage: current = .nil
+        case is FixedWidthStorage: current = .fixedWidth
+        case is StringStorage: current = .stringReference
         default: return nil // Unsupported types
         }
 

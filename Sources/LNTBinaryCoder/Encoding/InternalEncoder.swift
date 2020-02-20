@@ -8,12 +8,12 @@
 import Foundation
 
 class InternalEncoder: Encoder {
-    let storage: SingleValueStorage, context: EncodingContext
+    let storage: TempSingleValueStorage, context: EncodingContext
 
     var userInfo: [CodingUserInfoKey : Any] { context.userInfo }
     var codingPath: [CodingKey] { context.codingPath }
 
-    init(storage: SingleValueStorage, context: EncodingContext) {
+    init(storage: TempSingleValueStorage, context: EncodingContext) {
         self.storage = storage
         self.context = context
     }

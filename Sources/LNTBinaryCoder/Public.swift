@@ -27,7 +27,7 @@ public struct BinaryEncoder {
     public var userInfo: [CodingUserInfoKey: Any] = [:]
 
     public func encode<S>(_ value: S) throws -> Data where S: Encodable {
-        let temp = SingleValueStorage()
+        let temp = TempSingleValueStorage()
         
         let encodingContext = EncodingContext(userInfo: userInfo)
         let encoder = InternalEncoder(storage: temp, context: encodingContext)

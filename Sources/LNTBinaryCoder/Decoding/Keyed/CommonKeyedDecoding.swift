@@ -10,17 +10,18 @@ import Foundation
 protocol CommonKeyedDecodingContainer: KeyedDecodingContainerProtocol {
     var context: DecodingContext { get }
 
-    func header(forKey key: CodingKey) throws -> HeaderData
+    /// Returns block for a given `key`.
+    func block(forKey key: CodingKey) throws -> HeaderData
 }
 
 extension CommonKeyedDecodingContainer {
     var codingPath: [CodingKey] { context.codingPath }
 
     private func decoder(forKey key: CodingKey) throws -> InternalDecoder {
-        try InternalDecoder(parsed: header(forKey: key), context: context.appending(key))
+        try InternalDecoder(parsed: block(forKey: key), context: context.appending(key))
     }
 
-    func decodeNil(forKey key: Key) throws -> Bool { try header(forKey: key).header.tag == .nil }
+    func decodeNil(forKey key: Key) throws -> Bool { try block(forKey: key).header.tag == .nil }
     func decode<T>(_: T.Type, forKey key: Key) throws -> T where T: Decodable { try T(from: decoder(forKey: key)) }
 
     func superDecoder() throws -> Decoder { try decoder(forKey: SuperCodingKey()) }

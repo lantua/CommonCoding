@@ -24,7 +24,7 @@ struct InternalDecoder: Decoder {
         do {
             switch header {
             case let .regularKeyed(header): return try .init(NonUniformKeyedDecodingContainer(header: header, data: data, context: context))
-            case let .equisizedKeyed(header): return try .init(NonUniformKeyedDecodingContainer(header: header, data: data, context: context))
+            case let .equisizeKeyed(header): return try .init(NonUniformKeyedDecodingContainer(header: header, data: data, context: context))
             case let .uniformKeyed(header): return try .init(UniformKeyedDecodingContainer(header: header, data: data, context: context))
             default: break
             }
@@ -38,7 +38,7 @@ struct InternalDecoder: Decoder {
         do {
             switch header {
             case let .regularUnkeyed(header): return try RegularUnkeyedDecodingContainer(header: header, data: data, context: context)
-            case let .equisizedUnkeyed(header): return EquisizedUnkeyedDecodingContainer(header: header, data: data, context: context)
+            case let .equisizeUnkeyed(header): return EquisizedUnkeyedDecodingContainer(header: header, data: data, context: context)
             case let .uniformUnkeyed(header): return try UniformUnkeyedDecodingContainer(header: header, data: data, context: context)
 
             default: break
@@ -54,7 +54,7 @@ struct InternalDecoder: Decoder {
         switch header {
         case .fixedWidth: return FixedWidthDecodingContainer(data: data, context: context)
         case .nil: return NilDecodingContainer(context: context)
-        case .stringReference: return StringReferenceContainer(data: data, context: context)
+        case .stringReference: return StringDecodingContainer(data: data, context: context)
 
         default:
             throw DecodingError.typeMismatch(SingleValueDecodingContainer.self, context.error("Requesting from a \(header.tag) block"))

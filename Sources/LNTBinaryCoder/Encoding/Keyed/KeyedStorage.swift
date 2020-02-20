@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct KeyedOptimizableStorage: EncodingStorage {
+struct KeyedStorage: EncodingStorage {
     private var values: [String: EncodingStorage]
 
     var header = Header.nil
@@ -59,7 +59,7 @@ struct KeyedOptimizableStorage: EncodingStorage {
                 value.write(to: data.prefix(size))
                 data.removeFirst(size)
             }
-        case let .equisizedKeyed(header):
+        case let .equisizeKeyed(header):
             let size = header.size
             for value in values.values {
                 value.write(to: data.prefix(size))
@@ -76,7 +76,7 @@ struct KeyedOptimizableStorage: EncodingStorage {
     }
 }
 
-private extension KeyedOptimizableStorage {
+private extension KeyedStorage {
     func regularSize(keys: [Int]) -> (header: Header, payload: Int) {
         let header = Header.regularKeyed(.init(mapping: .init(zip(keys, values.values.lazy.map { $0.size }))))
         return (header, values.values.lazy.map { $0.size }.reduce(0, +))
@@ -84,7 +84,7 @@ private extension KeyedOptimizableStorage {
 
     func equisizeSize(keys: [Int]) -> (header: Header, payload: Int) {
         let maxSize = values.values.map { $0.size }.reduce(0, max)
-        return (.equisizedKeyed(.init(size: maxSize, keys: keys)), maxSize * keys.count)
+        return (.equisizeKeyed(.init(size: maxSize, keys: keys)), maxSize * keys.count)
     }
 
     func uniformSize(keys: [Int]) -> (header: Header, payload: Int)? {

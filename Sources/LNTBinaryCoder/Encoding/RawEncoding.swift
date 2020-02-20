@@ -8,26 +8,30 @@
 import Foundation
 
 extension Header {
+    /// Size of this header when used in uniform formats (uniform keyed, uniform unkeyed).
     var forcedSize: Int { max(size, 1) }
+
+    /// Size of this header
     var size: Int {
         switch self {
         case .nil: return 0
         case .fixedWidth, .stringReference: return 1
         case let .regularKeyed(header):
             return 2 + header.mapping.lazy.map { $0.key.vsuiSize + $0.size.vsuiSize }.reduce(0, +)
-        case let .equisizedKeyed(header):
+        case let .equisizeKeyed(header):
             return 2 + header.size.vsuiSize + header.keys.lazy.map { $0.vsuiSize }.reduce(0, +)
         case let .uniformKeyed(header):
             return 2 + header.size.vsuiSize + header.subheader.forcedSize + header.keys.lazy.map { $0.vsuiSize }.reduce(0, +)
         case let .regularUnkeyed(header):
             return 2 + header.sizes.lazy.map { $0.vsuiSize }.reduce(0, +)
-        case let .equisizedUnkeyed(header):
+        case let .equisizeUnkeyed(header):
             return 1 + header.size.vsuiSize
         case let .uniformUnkeyed(header):
             return 1 + header.size.vsuiSize + header.subheader.forcedSize + header.count.vsuiSize
         }
     }
 
+    /// Write the header to `data`, and remove the written part.
     func write(to data: inout Slice<UnsafeMutableRawBufferPointer>) {
         guard !data.isEmpty else {
             assert(size == 0)
@@ -50,7 +54,7 @@ extension Header {
                 key.write(to: &data)
             }
             append(0x01)
-        case let .equisizedKeyed(header):
+        case let .equisizeKeyed(header):
             header.size.write(to: &data)
             for key in header.keys {
                 key.write(to: &data)
@@ -68,7 +72,7 @@ extension Header {
                 size.write(to: &data)
             }
             append(0x01)
-        case let .equisizedUnkeyed(header):
+        case let .equisizeUnkeyed(header):
             header.size.write(to: &data)
         case let .uniformUnkeyed(header):
             header.size.write(to: &data)
@@ -79,11 +83,13 @@ extension Header {
 }
 
 extension Int {
+    /// Size of this value, in bytes, when being written in VSUI format.
     var vsuiSize: Int {
         assert(self >= 0)
         return Swift.max((bitWidth - leadingZeroBitCount + 6) / 7, 1)
     }
 
+    /// Write a VSUI value to `data` and remove the written part.
     func write(to data: inout Slice<UnsafeMutableRawBufferPointer>) {
         let size = vsuiSize
 

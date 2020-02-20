@@ -11,6 +11,7 @@ protocol CommonUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     var context: DecodingContext { get }
     var currentIndex: Int { get set }
 
+    /// Returns the block for the current element. Advance to the next block if `consume` is `true`.
     mutating func currentBlock(consume: Bool) throws -> HeaderData
 }
 

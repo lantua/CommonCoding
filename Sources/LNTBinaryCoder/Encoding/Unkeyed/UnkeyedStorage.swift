@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct UnkeyedOptimizableStorage: EncodingStorage {
+struct UnkeyedStorage: EncodingStorage {
     private var values: [EncodingStorage]
     var header = Header.nil
     private(set) var payloadSize = 0
@@ -55,7 +55,7 @@ struct UnkeyedOptimizableStorage: EncodingStorage {
                 value.write(to: data.prefix(size))
                 data.removeFirst(size)
             }
-        case let .equisizedUnkeyed(header):
+        case let .equisizeUnkeyed(header):
             let size = header.size
             for value in values {
                 value.write(to: data.prefix(size))
@@ -76,7 +76,7 @@ struct UnkeyedOptimizableStorage: EncodingStorage {
     }
 }
 
-private extension UnkeyedOptimizableStorage {
+private extension UnkeyedStorage {
     func regularSize() -> (header: Header, payload: Int) {
         let sizes = values.lazy.map { $0.size }
         let header = Header.regularUnkeyed(.init(sizes: Array(sizes)))
@@ -88,7 +88,7 @@ private extension UnkeyedOptimizableStorage {
         guard maxSize > 0 else {
             return nil
         }
-        return (.equisizedUnkeyed(.init(size: maxSize)), maxSize * values.count)
+        return (.equisizeUnkeyed(.init(size: maxSize)), maxSize * values.count)
     }
 
     func uniformSize() -> (header: Header, payload: Int)? {

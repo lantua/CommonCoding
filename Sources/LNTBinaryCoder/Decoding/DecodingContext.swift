@@ -43,6 +43,7 @@ struct DecodingContext {
 }
 
 extension DecodingContext {
+    /// Returns new context with coding path being appended by `key`.
     func appending(_ key: CodingKey) -> DecodingContext {
         var temp = self
         temp.path = .child(key: key, parent: path)

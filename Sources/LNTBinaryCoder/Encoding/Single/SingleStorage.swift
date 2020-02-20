@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct NilOptimizableStorage: EncodingStorage {
+struct NilStorage: EncodingStorage {
     var header: Header { .nil }
     var payloadSize: Int { 0 }
 
@@ -16,7 +16,7 @@ struct NilOptimizableStorage: EncodingStorage {
     func writePayload(to data: Slice<UnsafeMutableRawBufferPointer>) { }
 }
 
-struct FixedWidthOptimizableStorage: EncodingStorage {
+struct FixedWidthStorage: EncodingStorage {
     let raw: Data
 
     var header: Header { .fixedWidth }
@@ -30,7 +30,7 @@ struct FixedWidthOptimizableStorage: EncodingStorage {
     }
 }
 
-struct StringOptimizableStorage: EncodingStorage {
+struct StringStorage: EncodingStorage {
     private let string: String
     private var index = 0
 

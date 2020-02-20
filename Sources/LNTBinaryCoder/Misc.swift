@@ -7,6 +7,7 @@
 
 import Foundation
 
+/// Reconstructible coding path.
 enum CodingPath {
     case root
     indirect case child(key: CodingKey, parent: CodingPath)

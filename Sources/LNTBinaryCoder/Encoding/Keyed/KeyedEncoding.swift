@@ -7,16 +7,16 @@
 
 import Foundation
 
-class KeyedEncodingStorage: TemporaryEncodingStorage {
+class TempKeyedStorage: TemporaryEncodingStorage {
     var values: [String: TemporaryEncodingStorage] = [:]
 
     func finalize() -> EncodingStorage {
-        KeyedOptimizableStorage(values: values.mapValues { $0.finalize() })
+        KeyedStorage(values: values.mapValues { $0.finalize() })
     }
 }
 
 struct KeyedBinaryEncodingContainer<Key>: KeyedEncodingContainerProtocol where Key: CodingKey {
-    let storage: KeyedEncodingStorage, context: EncodingContext
+    let storage: TempKeyedStorage, context: EncodingContext
 
     var codingPath: [CodingKey] { context.codingPath }
 
@@ -29,7 +29,7 @@ struct KeyedBinaryEncodingContainer<Key>: KeyedEncodingContainerProtocol where K
     }
 
     mutating func encodeNil(forKey key: Key) throws {
-        register(key: key, value: NilOptimizableStorage())
+        register(key: key, value: NilStorage())
     }
 
     mutating func encode<T>(_ value: T, forKey key: Key) throws where T : Encodable {

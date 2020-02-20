@@ -17,6 +17,7 @@ extension Data {
 }
 
 extension Header {
+    /// Extract header from data, and remove the header portion.
     init(data: inout Data) throws {
         guard !data.isEmpty else {
             self = .nil
@@ -33,16 +34,17 @@ extension Header {
         case .fixedWidth: self = .fixedWidth
         case .stringReference: self = .stringReference
         case .regularKeyed: self = try .regularKeyed(.init(data: &data))
-        case .equisizedKeyed: self = try .equisizedKeyed(.init(data: &data))
+        case .equisizeKeyed: self = try .equisizeKeyed(.init(data: &data))
         case .uniformKeyed: self = try .uniformKeyed(.init(data: &data))
         case .regularUnkeyed: self = try .regularUnkeyed(.init(data: &data))
-        case .equisizedUnkeyed: self = try .equisizedUnkeyed(.init(data: &data))
+        case .equisizeUnkeyed: self = try .equisizeUnkeyed(.init(data: &data))
         case .uniformUnkeyed: self = try .uniformUnkeyed(.init(data: &data))
         }
     }
 }
 
 extension Data {
+    /// Read VSUI value from the data, and remove the read portion.
     mutating func readInteger() throws -> Int {
         var result = 0, first = 0 as UInt8
         repeat {
@@ -59,6 +61,7 @@ extension Data {
         return result
     }
 
+    /// Read null-terminated utf8 string from the data, and remove the read portion.
     mutating func readString() throws -> String {
         guard let terminatorIndex = firstIndex(where: { $0 == 0 }),
             let string = String(data: self[startIndex..<terminatorIndex], encoding: .utf8) else {
@@ -69,6 +72,7 @@ extension Data {
         return string
     }
 
+    /// Returns header and data portion.
     func splitHeader() throws -> HeaderData {
         var temp = self
         let header = try Header(data: &temp)

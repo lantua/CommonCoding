@@ -7,8 +7,8 @@
 
 import Foundation
 
-class SingleValueStorage: TemporaryEncodingStorage {
-    var value: TemporaryEncodingStorage = NilOptimizableStorage()
+class TempSingleValueStorage: TemporaryEncodingStorage {
+    var value: TemporaryEncodingStorage = NilStorage()
 
     func finalize() -> EncodingStorage {
         value.finalize()
@@ -16,17 +16,17 @@ class SingleValueStorage: TemporaryEncodingStorage {
 }
 
 struct SingleValueBinaryEncodingContainer: SingleValueEncodingContainer {
-    let storage: SingleValueStorage, context: EncodingContext
+    let storage: TempSingleValueStorage, context: EncodingContext
 
     var codingPath: [CodingKey] { context.codingPath }
 
     mutating func encodeNil() throws {
-        storage.value = NilOptimizableStorage()
+        storage.value = NilStorage()
     }
 
     mutating func encode(_ value: String) throws {
         context.register(string: value)
-        storage.value = StringOptimizableStorage(string: value)
+        storage.value = StringStorage(string: value)
     }
 
     mutating func encode(_ value: Bool) throws { try encode(value ? 1 : 0 as UInt8) }
@@ -36,7 +36,7 @@ struct SingleValueBinaryEncodingContainer: SingleValueEncodingContainer {
     mutating func encode(_ value: UInt) throws { try encode(UInt64(value)) }
 
     mutating func encode<T>(_ value: T) throws where T: Encodable, T: FixedWidthInteger {
-        storage.value = FixedWidthOptimizableStorage(
+        storage.value = FixedWidthStorage(
             raw: withUnsafePointer(to: value) {
                 Data(buffer: .init(start: $0, count: 1))
             }

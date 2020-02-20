@@ -7,10 +7,14 @@
 
 import Foundation
 
+/// Temporary Storage. Use while in the process of encoding data.
 protocol TemporaryEncodingStorage {
     func finalize() -> EncodingStorage
 }
 
+/// Compiled Storage.
+/// Created after the encoding process but before the writing process.
+/// Can be optimized to different context.
 protocol EncodingStorage: TemporaryEncodingStorage {
     var header: Header { get }
     var payloadSize: Int { get }

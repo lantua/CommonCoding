@@ -7,6 +7,7 @@
 
 import Foundation
 
+/// Basic Containers (Nil, Fixed-width, String).
 private protocol BasicDecodingContainer: SingleValueDecodingContainer {
     var context: DecodingContext { get }
     var header: Header { get }
@@ -15,7 +16,7 @@ private protocol BasicDecodingContainer: SingleValueDecodingContainer {
 
 extension BasicDecodingContainer {
     var codingPath: [CodingKey] { context.codingPath }
-    
+
     func decodeNil() -> Bool { header.tag == .nil }
     func decode(_: Bool.Type) throws -> Bool { try decode(UInt8.self) != 0 }
     func decode(_: Float.Type) throws -> Float { try Float(bitPattern: decode(UInt32.self)) }
@@ -65,7 +66,7 @@ struct FixedWidthDecodingContainer: BasicDecodingContainer {
     }
 }
 
-struct StringReferenceContainer: BasicDecodingContainer {
+struct StringDecodingContainer: BasicDecodingContainer {
     let data: Data, context: DecodingContext
 
     var header: Header { .stringReference }

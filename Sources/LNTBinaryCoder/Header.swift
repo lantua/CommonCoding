@@ -10,7 +10,7 @@ import Foundation
 enum Header {
     case `nil`, fixedWidth, stringReference
     case regularKeyed(RegularKeyedHeader), regularUnkeyed(RegularUnkeyedHeader)
-    case equisizedKeyed(EquisizedKeyedHeader), equisizedUnkeyed(EquisizedUnkeyedHeader)
+    case equisizeKeyed(EquisizedKeyedHeader), equisizeUnkeyed(EquisizedUnkeyedHeader)
     indirect case uniformKeyed(UniformKeyedHeader), uniformUnkeyed(UniformUnkeyedHeader)
 }
 
@@ -44,7 +44,6 @@ struct UniformUnkeyedHeader {
     var payloadSize: Int { (size - subheader.size) * count }
 }
 
-
 extension Header {
     enum Tag: UInt8 {
         case `nil` = 0x1
@@ -52,11 +51,11 @@ extension Header {
         case stringReference = 0x3
 
         case regularKeyed = 0x10
-        case equisizedKeyed
+        case equisizeKeyed
         case uniformKeyed
 
         case regularUnkeyed = 0x20
-        case equisizedUnkeyed
+        case equisizeUnkeyed
         case uniformUnkeyed
 
         static var terminator: UInt8 { 0x00 }
@@ -69,8 +68,8 @@ extension Header {
         case .stringReference: return .stringReference
         case .regularKeyed: return .regularKeyed
         case .regularUnkeyed: return .regularUnkeyed
-        case .equisizedKeyed: return .equisizedKeyed
-        case .equisizedUnkeyed: return .equisizedUnkeyed
+        case .equisizeKeyed: return .equisizeKeyed
+        case .equisizeUnkeyed: return .equisizeUnkeyed
         case .uniformKeyed: return .uniformKeyed
         case .uniformUnkeyed: return .uniformUnkeyed
         }

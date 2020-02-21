@@ -46,7 +46,6 @@ struct InternalDecoder: Decoder {
         } catch {
             throw DecodingError.dataCorrupted(context.error(error: error))
         }
-
         throw DecodingError.typeMismatch(UnkeyedDecodingContainer.self, context.error("Requesting from a \(header.tag) block"))
     }
 

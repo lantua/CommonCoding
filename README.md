@@ -7,6 +7,8 @@ Common Swift Encoder/Decoder
 Encoder and decoder for binary file format.
 For format specification, see [Format](Sources/LNTBinaryCoder/Format.md)
 
+**Note**: We have not reached 1.0 yet, and so the format for these coders may change in incompatible ways over time.
+
 ## CSV Coders
 
 Encoder and decoder for CSV file format as per [RFC 4180](https://tools.ietf.org/html/rfc4180).

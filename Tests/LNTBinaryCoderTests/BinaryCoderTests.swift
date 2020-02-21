@@ -116,6 +116,10 @@ final class BinaryCoderTests: XCTestCase {
             let value: [Int?] = [nil, nil, nil, nil, nil, nil]
             try XCTAssertEqual(decoder.decode([Int?].self, from: encoder.encode(value)), value)
         }
+        do {
+            let value = (0..<128).map(String.init)
+            try XCTAssertEqual(decoder.decode([String].self, from: encoder.encode(value)), value)
+        }
     }
 
     func testKeyedContainerRoundtrip() {
@@ -180,6 +184,11 @@ final class BinaryCoderTests: XCTestCase {
 
             try XCTAssertEqual(decoder.decode(Derived.self, from: encoder.encode(Derived(a: 33))).a, 33)
         }
+
+        do {
+            let value: [Int: Int?] = [1: nil, 2: nil, 3: nil, 4: nil, 5: nil, 6: nil]
+            try XCTAssertEqual(decoder.decode([Int: Int?].self, from: encoder.encode(value)), value)
+        }
     }
 
     func testRoundtrip() throws {
@@ -214,8 +223,7 @@ final class BinaryCoderTests: XCTestCase {
         /// Keyed containers will picked latter values.
         try XCTAssertEqual(decoder.decode([String: Int8].self, from: Data([0,0,1,0x61,0, 0x10,2,1,2,1,0x1, 1,0, 2,1])), ["a": 1])
         try XCTAssertEqual(decoder.decode([String: Int8].self, from: Data([0,0,1,0x61,0, 0x11,2,1,1,0x0, 1,0, 2,1])), ["a": 1])
-        try XCTAssertEqual(decoder.decode([String: Int8].self, from: Data([0,0,1,0x61,0, 0x12,2,2,1,1,0x0, 2,1])), ["a": 1])
-
+        try XCTAssertEqual(decoder.decode([String: Int8].self, from: Data([0,0,1,0x61,0, 0x12,2,1,1,0x0,2, 2,1])), ["a": 1])
     }
 
     func testNestedKeyedContainers() throws {
@@ -334,7 +342,7 @@ final class BinaryCoderTests: XCTestCase {
             // Container Too Small
             try XCTAssertThrowsError(decoder.decode([String: Int].self, from: Data([0,0,1,0x61,0, 0x10,10,1,0x01, 00])))
             try XCTAssertThrowsError(decoder.decode([String: Int].self, from: Data([0,0,1,0x61,0, 0x11,10,1,0x00, 00])))
-            try XCTAssertThrowsError(decoder.decode([String: Int].self, from: Data([0,0,1,0x61,0, 0x12,10,1,0x01, 00])))
+            try XCTAssertThrowsError(decoder.decode([String: Int].self, from: Data([0,0,1,0x61,0, 0x12,10,0x01,1, 00])))
 
             // Invalid Element
             try XCTAssertThrowsError(decoder.decode([String: Int].self, from: Data([0,0,1,0x61,0, 0x10,2,1,0x01, 0x00,0])))
@@ -359,7 +367,7 @@ final class BinaryCoderTests: XCTestCase {
             // Invalid Element
             try XCTAssertThrowsError(decoder.decode([Int].self, from: Data([0,0,0, 0x20,2,2,0x1, 0,0,0,0])))
             try XCTAssertThrowsError(decoder.decode([Int].self, from: Data([0,0,0, 0x21,2, 3,0x80,0])))
-            try XCTAssertThrowsError(decoder.decode([Int].self, from: Data([0,0,0, 0x22,2,3,2, 0x80,0x80])))
+            try XCTAssertThrowsError(decoder.decode([Int].self, from: Data([0,0,0, 0x22,2,2,3, 0x80,0x80])))
         }
 
         do {

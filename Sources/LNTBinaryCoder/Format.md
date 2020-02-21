@@ -1,18 +1,6 @@
-# Format
+# Variable-Sized Unsigned Integer
 
-This format consists of 2 parts: String map and Data storage. Each part is stored separately as shown below:
-
-```
-*--------------------------------------------------------*
-| 0x00 | 0x00 | String count | String map | Data storage |
-*--------------------------------------------------------*
-```
-
-String count, the number of strings in String map, is stored in the beginning using Variable-Sized Unsigned Integer (see below).
-
-## Variable-Sized Unsigned Integer
-
-This format extensively uses Variable-Sized Unsigned Integer (VSUI). The format is as follows, for each byte:
+We extensively uses Variable-Sized Unsigned Integer (VSUI). The format is as follows, for each byte:
 
 - The Most Significant Bit (MSB) is used as continuation bit. It is 1 if the next byte is part of this integer, and 0 otherwise.
 - Other 7 bits is used for the actual value, in big-endian order.
@@ -28,23 +16,49 @@ So the value of this byte pattern is `54309271`.
 
 **Note**
 
-In theory, this format allows for integers of arbitrary size to be stored. In practive, the encoder and decoder generally use native integers to store and compute these values. As such, data encoded with 64-bit machine may not be decoded successfully on 32-bit machine.
+In theory, VSUI permits integer of any size. In practive, the encoder and decoder use native `Int` to calculate these values. As such, data encoded with 64-bit machine may not be decoded successfully on 32-bit machine.
 
-## String Map
+# File Format
 
-The String map is an array containing all strings found in the data storage (especially keys). Data storage refers to values in this array using (1-based) indices.
+Binary file format consists of 3 parts: Version Number, String map, and Data storage. Each part is stored separately as shown below:
 
-String map is stored as a sequence of utf-8 strings, separated by null terminator.
+```
+*--------------------------------------------*
+| Version Number | String Map | Data Storage |
+*--------------------------------------------*
+```
 
-## Data Storage
+# Version Number
 
-The format of each container is described below. Some containers have end-point markers which is indicated by parenthesis. These markers will be used should there be enough space, and will be ignored otherwise.
+The first two bytes are version number. Currently the value is `0x00 0x00`
 
-### Tags, Headers, and Payload
+```
+*-------------*
+| 0x00 | 0x00 |
+*-------------*
+```
+
+# String Map
+
+String map is an array containing all strings found in the data storage (especially keys). Data storage refers to values in string map using 1-based indices.
+
+String map starts with a VSUI number indicating the total number of strings, followed by list of null-terminated strings.
+
+```
+*-------------------------------------------------*
+| N (VSUI) | String 1 | String 2 | ... | String N | 
+*-------------------------------------------------*
+```
+
+# Data Storage
+
+Data storage contains a single object in form of a container. This section describes all valid containers.
+
+## Tags, Headers, and Payload
 
 Every container consists of two portions; header, and payload.
 - Header contains the metadata to the data block (including Tag).
-  - Tag is part of the header. It is the first byte used to determine the type of the storage.
+  - Tag is the first byte of the header. It is used to determine the type of the container.
 - Payload contains the data that is being stored.
 
 For all diagrams, we use the following legend:
@@ -59,16 +73,16 @@ For multi-item containers:
 - Tag: The tag shared among items.
 - Header: The header shared among items.
 
-### Single-Value Container
+## Single-Value Container
 
-This section includes all supported single-value container. The headers of these containers consists of only the tag, the rest are payloads.
+This section includes all supported single-value container. The headers of these containers consists of only tags, the rest are payloads.
 
 Note:
-This is different from `SingleValueDecodingContainer` and `SingleValueEncodingContainer`, which is transparent to the format.  
+This is different from `SingleValueDecodingContainer` and `SingleValueEncodingContainer`, which are transparent to the format.  
 
-#### Nil
+### Nil
 
-`nil` is stored as a single (optional) tag `0x01`:
+`nil` is stored as an empty block. If the block is not empty, the first byte will be the tag, `0x01`. 
 
 ```
 *--------*
@@ -76,9 +90,9 @@ This is different from `SingleValueDecodingContainer` and `SingleValueEncodingCo
 *--------*
 ```
 
-#### Fixed Width Types
+### Fixed Width Types
 
-Types in this category include `FixedWidthInteger`s. It is stored as a tag `0x02`, followed by the payload.
+Types in this category include all fixed-width integer; `Int32`, `UInt16`, etc. It is stored as a tag `0x02` followed by the payload. Payloads are stored in little-endian order, and is of the same size as the object itself, e.g. 4 bytes for `Int32`.
 
 ```
 *------*------*
@@ -86,9 +100,7 @@ Types in this category include `FixedWidthInteger`s. It is stored as a tag `0x02
 *------*------*
 ```
 
-Payloads are stored in little-endian order, and is of the same size as the object itself, e.g. 4 bytes for `Int32`.
-
-#### `Int`, `UInt`, `Float`, `Double`, and `Bool`
+### Delegating Types
 
 Types in this category delegates the encoding to another types.
 
@@ -98,23 +110,23 @@ Types in this category delegates the encoding to another types.
 - `Double` is encoded as `UInt64` (using bit pattern).
 - `Bool` is encoded as `UInt8`. It is `false` if the value is `0`, and is `true` otherwise.
 
-#### String
+### String
 
 `String` is stored inside String map, and be refered to from Data storage using (VSUI) index.
 
 ```
-*------*-----*
-| 0x03 | Key |
-*------*-----*
+*------*-------*
+| 0x03 | Index |
+*------*-------*
 ```
 
-### Keyed Container
+## String-Based Keyed Container
 
-Keyed container has a few representations with different size-performance tradeoff. Encoders may choose any valid representation.
+String-based keyed container has a few representations with different size-performance tradeoff. Encoders may choose any valid representation.
 
-#### Regular Case
+### Regular Case
 
-This is valid for all containers containing at least one key. 
+This is valid for all containers.
 
 ```
 *-----------------------------------------------------*--------------------------------*
@@ -124,11 +136,9 @@ This is valid for all containers containing at least one key.
 *-----------------------------------------------------*--------------------------------*
 ```
 
-Note that `Size n` is replaced with `0x01` to denote the last key.
+### Equisized Case
 
-#### Equisized Case
-
-This is valid if all payloads have the same size.
+This is valid if all items have the same size.
 
 ```
 *--------------------------------------------------*--------------------------------*
@@ -138,23 +148,27 @@ This is valid if all payloads have the same size.
 *--------------------------------------------------*--------------------------------*
 ```
 
-#### Uniform Case
+### Uniform Case
 
-This is valid if all payload have the same size and header.
+This is valid if all items have the same size and header.
 
 ```
 *-----------------------------------------------------------*-----------------------------------------*
 |                           Header                          |                 Payload                 |
 *-----------------------------------------------------------*-----------------------------------------*
-| 0x12 | Size | Header | Key 1 | Key 2 | ... | Key n | 0x00 | Payload 1 | Payload 2 | ... | Payload n |
+| 0x12 | Size | Key 1 | Key 2 | ... | Key n | 0x00 | Header | Payload 1 | Payload 2 | ... | Payload n |
 *-----------------------------------------------------------*-----------------------------------------*
 ```
 
-### Unkeyed Container
+## Int-Based Keyed Container
+
+This format does not support `Int`-based keyed container. Keys are converted to `String` and the container is encoded as string-based keyed container.
+
+## Unkeyed Container
 
 Unkeyed container has a few representations with different size-performance tradeoff. Encoders may choose any valid representation.
 
-#### Regular Case
+### Regular Case
 
 This is valid for all containers.
 
@@ -166,9 +180,9 @@ This is valid for all containers.
 *----------------------------------------------*--------------------------------*
 ```
 
-#### Equisized Case
+### Equisized Case
 
-This is valid if all payloads have the same size.
+This is valid if all items have the same size, and the container contains at least one item. If there are more space than needed, last item will be followed by `0x00`.
 
 ```
 *-------------*-----------------------------------------*
@@ -178,39 +192,41 @@ This is valid if all payloads have the same size.
 *-------------*-----------------------------------------*
 ```
 
-#### Uniform Case
+### Uniform Case
 
-This is valid if all payloads have the same size and header.
+This is valid if all items have the same size and header.
 
 ```
 *------------------------------*-----------------------------------------*
 |            Header            |                 Payload                 |
 *------------------------------*-----------------------------------------*
-| 0x22 | Size | Header | Count | Payload 1 | Payload 2 | ... | Payload n |
+| 0x22 | Size | Count | Header | Payload 1 | Payload 2 | ... | Payload n |
 *------------------------------*-----------------------------------------*
 ```
 
-### Design Note
+Note that `Size` referes to the size of the item (with header attached) not the size of the payload.
 
-#### Padding
+# Design Note
 
-This format is designed specifically to allow padding, to add byte at the end of data. Where it would be ambiguous between data and gibberish, it uses an *endpoint marker* which will generally be an invalid value to appear in the middle.
+## Padding
 
-For keyed and unkeyed containers, this also allows payloads with different sizes to be padded so that the sizes are equal, making the container eligible for equisized form. 
+This format is designed specifically to allow padding at the end of the data. It uses an *endpoint marker* anywhere the boundary between data and the padding is ambiguous.
 
-#### Values of Tags
+For keyed and unkeyed containers, this also allows payloads with different sizes to be padded to make the containers eligible for equisized form.
 
-The *tags* of objects can not be `0x00`. Some containers used `0x00` as endpoint markers where tags would be if there are more items.
+## Values of Tags
 
-We should also reserve some tags (`0x80` - `0xff`) for when the tag space is filled up. At which point we can still use them as a head for multibyte tags.
+The *tags* of objects can not be `0x00`. Some containers used `0x00` as endpoint markers where tags would be should there be more items.
 
-#### Size of Item
+We should also reserve some tags (`0x80` - `0xff`) for when the tag space is filled up. At which point we can still use them as a head for multi-byte tags.
 
-It is possible to avoid using object of size 1 altogether. `nil` object can be encoded as empty byte, and all other objects requires at least 2 bytes (1 for tag, 1 for data). As such, some containers uses `0x01` as an endpoint marker as its location overlapped where `Size` would be. The only reason this would be problematic is if we add another data-less type, another `nil`-list type.
+## Size of Item
 
-One alternative would be to have `nil` strictly be 1-byte, and use `0x00` as the endpoint, but having `nil` be 0 byte saves more space without much sacrifice in performance.
+It is possible to avoid using object of size 1 altogether. `nil` object can be encoded as empty block, and all other objects requires at least 2 bytes (1 for tag, 1 for data). As such, some containers uses `0x01` as an endpoint marker as its location overlapped where `Size` would be. One reason this would be problematic is if we add another data-less type.
 
-#### Uniqueness of VSUI
+One alternative would be to have `nil` use exactly 1 byte, and use `0x00` as the endpoint, but having `nil` be 0 byte saves more space without much sacrifice in performance.
+
+## Uniqueness of VSUI
 
 A VSUI byte pattern uniquely determines the integer value. The converse is not true.
 For example, following byte patterns matches `0x42`:
@@ -222,6 +238,6 @@ For example, following byte patterns matches `0x42`:
 
 and so on. This is intentional as it allows the encoder to make a trade-off between compression rate and encoding performance. An encoder may not know value of each integer at the time of encoding and put a fixed-size placeholder for editing later. Achieving higher compression rate may require the encoder to run another pass to optimize those placeholders.
 
-#### Non-overlapping Rule
+## Non-overlapping Rule
 
-The data storage employs non-overlapping rule. As such the maximum size of an object can be calculated using the position of the next object (and of the current object). The top-level object can be any valid object.
+The data storage employs non-overlapping rule. As such, the size of an object can be calculated using the position of the next object (and of the current object).

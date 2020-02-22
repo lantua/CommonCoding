@@ -1,9 +1,11 @@
 import XCTest
 
-import LNTCSVCoderTests
-import LNTBinaryCoderTests
+import LNTCSVCodingTests
+import LNTBinaryCodingTests
+import LNTSharedCodingTests
 
 var tests = [XCTestCaseEntry]()
-tests += LNTCSVCoderTests.allTests()
-tests += LNTBinaryCoderTests.allTests()
+tests += LNTSharedCodingTests.allTests()
+tests += LNTCSVCodingTests.allTests()
+tests += LNTBinaryCodingTests.allTests()
 XCTMain(tests)

@@ -4,15 +4,15 @@
 import PackageDescription
 
 let package = Package(
-    name: "CommonCoder",
+    name: "CommonCoding",
     products: [
         // Products define the executables and libraries produced by a package, and make them visible to other packages.
         .library(
-            name: "LNTCSVCoder",
-            targets: ["LNTCSVCoder"]),
+            name: "LNTCSVCoding",
+            targets: ["LNTCSVCoding"]),
         .library(
-            name: "LNTBinaryCoder",
-            targets: ["LNTBinaryCoder"]),
+            name: "LNTBinaryCoding",
+            targets: ["LNTBinaryCoding"]),
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.
@@ -22,16 +22,21 @@ let package = Package(
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.
         // Targets can depend on other targets in this package, and on products in packages which this package depends on.
         .target(
-            name: "LNTCSVCoder",
-            dependencies: []),
+            name: "LNTCSVCoding",
+            dependencies: ["LNTSharedCoding"]),
         .target(
-            name: "LNTBinaryCoder",
-            dependencies: []),
+            name: "LNTBinaryCoding",
+            dependencies: ["LNTSharedCoding"]),
+        .target(name: "LNTSharedCoding"),
+
         .testTarget(
-            name: "LNTCSVCoderTests",
-            dependencies: ["LNTCSVCoder"]),
+            name: "LNTCSVCodingTests",
+            dependencies: ["LNTCSVCoding"]),
         .testTarget(
-            name: "LNTBinaryCoderTests",
-            dependencies: ["LNTBinaryCoder"]),
+            name: "LNTBinaryCodingTests",
+            dependencies: ["LNTBinaryCoding"]),
+        .testTarget(
+            name: "LNTSharedCodingTests",
+            dependencies: ["LNTSharedCoding"]),
     ]
 )

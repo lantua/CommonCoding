@@ -1,23 +1,23 @@
-# CommonCoder
+# CommonCoding
 
 Common Swift Encoder/Decoder
 
-## Binary Coders
+## Binary Codings
 
 Encoder and decoder for binary file format.
-For format specification, see [Format](Sources/LNTBinaryCoder/Format.md)
+For format specification, see [Format](Sources/LNTBinaryCoding/Format.md)
 
 **Note**: We have not reached 1.0 yet, and so the format for these coders may change in incompatible ways over time.
 
-## CSV Coders
+## CSV Codings
 
 Encoder and decoder for CSV file format as per [RFC 4180](https://tools.ietf.org/html/rfc4180).
-For API information, see [CSV README](Sources/LNTCSVCoder/README.md).
+For API information, see [CSV README](Sources/LNTCSVCoding/README.md).
 
 A decoding example,
 
 ```swift
-import LNTCSVCoder
+import LNTCSVCoding
 
 struct SomeStruct: Equatable, Codable {
   var a: Int, b: Double?, c: String
@@ -43,7 +43,7 @@ values = [
 An encoding example,
 
 ```swift
-import LNTCSVCoder
+import LNTCSVCoding
 
 struct SomeStruct: Equatable, Codable {
   var a: Int, b: Double?, c: String

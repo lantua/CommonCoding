@@ -43,33 +43,68 @@ struct NilDecodingContainer: BasicDecodingContainer {
     }
 }
 
-struct FixedWidthDecodingContainer: BasicDecodingContainer {
+struct SignedDecodingContainer: BasicDecodingContainer {
     let data: Data, context: DecodingContext
 
-    var header: Header { .fixedWidth }
+    var header: Header { .signed }
 
     func decode<T>(_ type: T.Type) throws -> T where T: Decodable, T: FixedWidthInteger {
-        guard MemoryLayout<T>.size <= data.count else {
+        guard 0 < data.count else {
             throw DecodingError.typeMismatch(T.self, context.error("Container is too small"))
         }
 
-        var result: T = 0
-        withUnsafeMutableBytes(of: &result) {
-            $0.copyBytes(from: data.prefix(MemoryLayout<T>.size))
+        guard T.isSigned else {
+            throw DecodingError.typeMismatch(T.self, context.error("Signed integer container found"))
         }
 
-        return result.littleEndian
-    }
+        var result: T = 0
+        var littleEndian = data.prefix(T.bitWidth / 8)
+        do {
+            let byte = littleEndian.removeLast()
+            result = T(Int8(bitPattern: byte))
+        }
 
+        for byte in littleEndian.reversed() {
+            result <<= 8
+            result += T(byte)
+        }
+        return result
+    }
     func decode(_: String.Type) throws -> String {
-        throw DecodingError.typeMismatch(String.self, context.error("Fixed-width container found"))
+        throw DecodingError.typeMismatch(String.self, context.error("Signed integer container found"))
+    }
+}
+
+struct UnsignedDecodingContainer: BasicDecodingContainer {
+    let data: Data, context: DecodingContext
+
+    var header: Header { .unsigned }
+
+    func decode<T>(_ type: T.Type) throws -> T where T: Decodable, T: FixedWidthInteger {
+        guard 0 < data.count else {
+            throw DecodingError.typeMismatch(T.self, context.error("Container is too small"))
+        }
+
+        guard !T.isSigned else {
+            throw DecodingError.typeMismatch(T.self, context.error("Unsigned integer container found"))
+        }
+
+        var result: T = 0
+        for byte in data.prefix(T.bitWidth / 8).reversed() {
+            result <<= 8
+            result += T(byte)
+        }
+        return result
+    }
+    func decode(_: String.Type) throws -> String {
+        throw DecodingError.typeMismatch(String.self, context.error("Unsigned integer container found"))
     }
 }
 
 struct StringDecodingContainer: BasicDecodingContainer {
     let data: Data, context: DecodingContext
 
-    var header: Header { .stringReference }
+    var header: Header { .string }
 
     func decode<T>(_ type: T.Type) throws -> T where T : Decodable {
         throw DecodingError.typeMismatch(T.self, context.error("String container found"))

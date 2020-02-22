@@ -12,7 +12,7 @@ extension Header {
     var size: Int {
         switch self {
         case .nil: return 0
-        case .fixedWidth, .stringReference: return 1
+        case .signed, .unsigned, .string: return 1
         case let .regularKeyed(header):
             return 2 + header.mapping.lazy.map { $0.key.vsuiSize + $0.size.vsuiSize }.reduce(0, +)
         case let .equisizeKeyed(header):
@@ -43,7 +43,7 @@ extension Header {
         append(tag.rawValue)
 
         switch self {
-        case .nil, .fixedWidth, .stringReference: break
+        case .nil, .signed, .unsigned, .string: break
 
         case let .regularKeyed(header):
             for (key, size) in header.mapping {

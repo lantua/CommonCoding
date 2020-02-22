@@ -90,22 +90,36 @@ This is different from `SingleValueDecodingContainer` and `SingleValueEncodingCo
 *--------*
 ```
 
-### Fixed Width Types
+### Signed Integer Types
 
-Types in this category include all fixed-width integer; `Int32`, `UInt16`, etc. It is stored as a tag `0x02` followed by the payload. Payloads are stored in little-endian order, and is of the same size as the object itself, e.g. 4 bytes for `Int32`.
+Types in this category include `Int`, `Int8`, `Int16`, `Int32`, `Int64`. It is stored as a tag followed by the payload in little endian byte order.
+
+If the payload is shorter than the expected type (storing `Int64` on a three-byte space), the remaining byte follows the sign bit of the last byte. 
+If the payload is longer than the expected type (storing `Int64` on a five-byte space), the unused bytes, up to 16 bytes including the payload, are set to follow the signs of the last byte.  
 
 ```
-*------*------*
-| 0x02 | Data |
-*------*------*
+*--------------------------*
+| 0x02 | Data | (sign) ... |
+*--------------------------*
+```
+
+### Unsigned Integer Types
+
+Types in this category include `UInt`, `UInt8`, `UInt16`, `UInt32`, `UInt64`. It is stored as a tag followed by the payload in little endian byte order.
+
+If the payload is shorter than the expected type (storing `UInt64` on a three-byte space), the remaining bytes are treated as zero. 
+If the payload is longer than the expected type (storing `UInt64` on a five-byte space), the unused bytes, up to 16 bytes including the payload, are set to zero.  
+
+```
+*--------------------------*
+| 0x03 | Data | (0x00) ... |
+*--------------------------*
 ```
 
 ### Delegating Types
 
 Types in this category delegates the encoding to another types.
 
-- `Int` is encoded as `Int64`.
-- `UInt` is encoded as `UInt64`.
 - `Float` is encoded as `UInt32` (using bit pattern).
 - `Double` is encoded as `UInt64` (using bit pattern).
 - `Bool` is encoded as `UInt8`. It is `false` if the value is `0`, and is `true` otherwise.
@@ -116,7 +130,7 @@ Types in this category delegates the encoding to another types.
 
 ```
 *------*-------*
-| 0x03 | Index |
+| 0x04 | Index |
 *------*-------*
 ```
 

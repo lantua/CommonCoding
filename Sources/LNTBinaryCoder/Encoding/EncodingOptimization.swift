@@ -28,8 +28,9 @@ func uniformize<C>(values: C) -> (elementSize: Int, header: Header)? where C: Co
         var current: Header.Tag
         switch value {
         case is NilStorage: current = .nil
-        case is FixedWidthStorage: current = .fixedWidth
-        case is StringStorage: current = .stringReference
+        case is SignedStorage: current = .signed
+        case is UnsignedStorage: current = .unsigned
+        case is StringStorage: current = .string
         default: return nil // Unsupported types
         }
 
@@ -46,8 +47,9 @@ func uniformize<C>(values: C) -> (elementSize: Int, header: Header)? where C: Co
     switch tag {
     case nil: return nil
     case .nil: return (0, .nil)
-    case .fixedWidth: return (values.lazy.map { $0.size }.reduce(0, max), .fixedWidth)
-    case .stringReference: return (values.lazy.map { $0.size }.reduce(0, max), .stringReference)
+    case .signed: return (values.lazy.map { $0.size }.reduce(0, max), .signed)
+    case .unsigned: return (values.lazy.map { $0.size }.reduce(0, max), .unsigned)
+    case .string: return (values.lazy.map { $0.size }.reduce(0, max), .string)
     default: fatalError("Unreachable")
     }
 }

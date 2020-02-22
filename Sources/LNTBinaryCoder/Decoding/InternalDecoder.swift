@@ -51,9 +51,10 @@ struct InternalDecoder: Decoder {
 
     func singleValueContainer() throws -> SingleValueDecodingContainer {
         switch header {
-        case .fixedWidth: return FixedWidthDecodingContainer(data: data, context: context)
+        case .signed: return SignedDecodingContainer(data: data, context: context)
+        case .unsigned: return UnsignedDecodingContainer(data: data, context: context)
         case .nil: return NilDecodingContainer(context: context)
-        case .stringReference: return StringDecodingContainer(data: data, context: context)
+        case .string: return StringDecodingContainer(data: data, context: context)
 
         default:
             throw DecodingError.typeMismatch(SingleValueDecodingContainer.self, context.error("Requesting from a \(header.tag) block"))

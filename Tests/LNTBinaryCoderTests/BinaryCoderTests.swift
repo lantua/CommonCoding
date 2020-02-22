@@ -47,6 +47,7 @@ final class BinaryCoderTests: XCTestCase {
         try XCTAssertEqual(decoder.decode(Int?.self, from: encoder.encode(-7)), -7)
         try XCTAssertEqual(decoder.decode(UInt.self, from: encoder.encode(5 as UInt)), 5)
         try XCTAssertEqual(decoder.decode(String.self, from: encoder.encode("ffah")), "ffah")
+        try XCTAssertEqual(decoder.decode(Int.self, from: encoder.encode(-77283)), -77283)
     }
 
     func testUnkeyedContainerRoundtrip() throws {
@@ -189,6 +190,11 @@ final class BinaryCoderTests: XCTestCase {
             let value: [Int: Int?] = [1: nil, 2: nil, 3: nil, 4: nil, 5: nil, 6: nil]
             try XCTAssertEqual(decoder.decode([Int: Int?].self, from: encoder.encode(value)), value)
         }
+
+        do {
+            struct A: Codable, Equatable { var a, b, c, d, e, f, g: Int? }
+            try XCTAssertEqual(decoder.decode(A.self, from: encoder.encode(A())), A())
+        }
     }
 
     func testRoundtrip() throws {
@@ -221,9 +227,27 @@ final class BinaryCoderTests: XCTestCase {
         try XCTAssertNil(decoder.decode(Int?.self, from: Data([0,0,0])))
 
         /// Keyed containers will picked latter values.
-        try XCTAssertEqual(decoder.decode([String: Int8].self, from: Data([0,0,1,0x61,0, 0x10,2,1,2,1,0x1, 1,0, 2,1])), ["a": 1])
-        try XCTAssertEqual(decoder.decode([String: Int8].self, from: Data([0,0,1,0x61,0, 0x11,2,1,1,0x0, 1,0, 2,1])), ["a": 1])
-        try XCTAssertEqual(decoder.decode([String: Int8].self, from: Data([0,0,1,0x61,0, 0x12,2,1,1,0x0,2, 2,1])), ["a": 1])
+        try XCTAssertEqual(decoder.decode([String: Int8].self, from: Data(
+            [0,0,
+             1,Character("a").asciiValue!,0,
+             Header.Tag.regularKeyed.rawValue, 2,1, 2,1, 0x1,
+             1,0,
+             2,1
+        ])), ["a": 1])
+        try XCTAssertEqual(decoder.decode([String: Int8].self, from: Data(
+            [0,0,
+             1,Character("a").asciiValue!,0,
+             Header.Tag.equisizeKeyed.rawValue, 2, 1,1,0x0,
+             1,0,
+             2,1
+        ])), ["a": 1])
+        try XCTAssertEqual(decoder.decode([String: Int8].self, from: Data(
+            [0,0,
+             1,Character("a").asciiValue!,0,
+             Header.Tag.uniformKeyed.rawValue, 2, 1,1,0x0, Header.Tag.signed.rawValue,
+             2,
+             1
+        ])), ["a": 1])
     }
 
     func testNestedKeyedContainers() throws {
@@ -316,20 +340,16 @@ final class BinaryCoderTests: XCTestCase {
         try XCTAssertThrowsError(decoder.decode(Int.self, from: Data())) // Empty file
         try XCTAssertThrowsError(decoder.decode(Int.self, from: Data([0,1]))) // Invalid version
         try XCTAssertThrowsError(decoder.decode(Int.self, from: Data([0,0,0x80]))) // Invalid String Map count
-        try XCTAssertThrowsError(decoder.decode([Int].self, from: Data([0,0,0, 0x0,3,0x01,0]))) // Invalid Tag
-        try XCTAssertThrowsError(decoder.decode(Int.self, from: Data([0,0,1, 0x80,0]))) // Invalid String
-        try XCTAssertThrowsError(decoder.decode(Int.self, from: Data([0,0,1, 0x80]))) // Invalid String
-
+        try XCTAssertThrowsError(decoder.decode([Int].self, from: Data([0,0, 0, 0x0, 3,0x01,0]))) // Invalid Tag
+        try XCTAssertThrowsError(decoder.decode(Int.self, from: Data([0,0, 1,0x80,0]))) // Invalid String
+        try XCTAssertThrowsError(decoder.decode(Int.self, from: Data([0,0, 1,0x80]))) // Invalid String
 
         do {
             // Single
 
             // Container Too small
-            try XCTAssertThrowsError(decoder.decode(Int.self, from: Data([0,0,0, 0x02,0,0,0,0])))
-
-            // Invalid String
-            try XCTAssertThrowsError(decoder.decode(String.self, from: Data([0,0,0, 0x02,0,0,0,0,0,0,0,0])))
-            try XCTAssertThrowsError(decoder.decode(String.self, from: Data([0,0,0, 0x03,1])))
+            try XCTAssertThrowsError(decoder.decode(Int.self, from: Data([0,0,0, Header.Tag.signed.rawValue])))
+            try XCTAssertThrowsError(decoder.decode(UInt.self, from: Data([0,0,0, Header.Tag.unsigned.rawValue])))
 
             // Decoding from nil
             try XCTAssertThrowsError(decoder.decode(Int.self, from: Data([0,0,0,])))
@@ -338,21 +358,28 @@ final class BinaryCoderTests: XCTestCase {
 
         do {
             // Keyed
+            let stringMapA: [UInt8] = [0,0, 1,Character("a").asciiValue!,0]
 
             // Container Too Small
-            try XCTAssertThrowsError(decoder.decode([String: Int].self, from: Data([0,0,1,0x61,0, 0x10,10,1,0x01, 00])))
-            try XCTAssertThrowsError(decoder.decode([String: Int].self, from: Data([0,0,1,0x61,0, 0x11,10,1,0x00, 00])))
-            try XCTAssertThrowsError(decoder.decode([String: Int].self, from: Data([0,0,1,0x61,0, 0x12,10,0x01,1, 00])))
+            try XCTAssertThrowsError(decoder.decode([String: Int].self, from: Data(stringMapA + [Header.Tag.regularKeyed.rawValue,10,1,0x01, 00])))
+            try XCTAssertThrowsError(decoder.decode([String: Int].self, from: Data(stringMapA + [Header.Tag.equisizeKeyed.rawValue,10,1,0x00, 00])))
+            try XCTAssertThrowsError(decoder.decode([String: Int].self, from: Data(stringMapA + [Header.Tag.uniformKeyed.rawValue,10,0x01,1, 00])))
 
             // Invalid Element
-            try XCTAssertThrowsError(decoder.decode([String: Int].self, from: Data([0,0,1,0x61,0, 0x10,2,1,0x01, 0x00,0])))
-            try XCTAssertThrowsError(decoder.decode([String: Int].self, from: Data([0,0,1,0x61,0, 0x11,2,1,0x00, 0x00,0])))
+            try XCTAssertThrowsError(decoder.decode([String: Int].self, from: Data(stringMapA + [Header.Tag.regularKeyed.rawValue,2,1,0x01, 0x00,0])))
+            try XCTAssertThrowsError(decoder.decode([String: Int].self, from: Data(stringMapA + [Header.Tag.equisizeKeyed.rawValue,2,1,0x00, 0x00,0])))
 
             // Key not found
             do {
                 struct A: Codable { var a, b: Int }
-                struct B: Codable { var a: Int }
-                try XCTAssertThrowsError(decoder.decode(A.self, from: encoder.encode(B(a: 4))))
+                struct B: Codable { var a = 0, c = "" }
+                try XCTAssertThrowsError(decoder.decode(A.self, from: encoder.encode(B())))
+            }
+            // Key not found - Uniform
+            do {
+                struct A: Codable { var a = 0, b = 0, c = 0, d = 0, e = 0, f = 0 }
+                struct B: Codable { var a = 0, b = 0, c = 0, d = 0, e = 0 }
+                try XCTAssertThrowsError(decoder.decode(A.self, from: encoder.encode(B())))
             }
         }
 
@@ -360,28 +387,35 @@ final class BinaryCoderTests: XCTestCase {
             // Unkeyed
 
             // Container Too Small
-            try XCTAssertThrowsError(decoder.decode([Int].self, from: Data([0,0,0, 0x20,2,2,0x1, 0])))
-            try XCTAssertThrowsError(decoder.decode([Int].self, from: Data([0,0,0, 0x21,2, 1])))
-            try XCTAssertThrowsError(decoder.decode([Int].self, from: Data([0,0,0, 0x22,2,2,2, 1])))
+            try XCTAssertThrowsError(decoder.decode([Int].self, from: Data([0,0,0, Header.Tag.regularUnkeyed.rawValue,2,2,0x1, 0])))
+            try XCTAssertThrowsError(decoder.decode([Int].self, from: Data([0,0,0, Header.Tag.equisizeUnkeyed.rawValue,2, 1])))
+            try XCTAssertThrowsError(decoder.decode([Int].self, from: Data([0,0,0, Header.Tag.uniformUnkeyed.rawValue,2,2,1, 1])))
 
             // Invalid Element
-            try XCTAssertThrowsError(decoder.decode([Int].self, from: Data([0,0,0, 0x20,2,2,0x1, 0,0,0,0])))
-            try XCTAssertThrowsError(decoder.decode([Int].self, from: Data([0,0,0, 0x21,2, 3,0x80,0])))
-            try XCTAssertThrowsError(decoder.decode([Int].self, from: Data([0,0,0, 0x22,2,2,3, 0x80,0x80])))
+            try XCTAssertThrowsError(decoder.decode([Int].self, from: Data([0,0,0, Header.Tag.regularUnkeyed.rawValue,2,2,0x1, 0,0,0,0])))
+            try XCTAssertThrowsError(decoder.decode([Int].self, from: Data(
+                [0,0,0, Header.Tag.equisizeUnkeyed.rawValue,2,
+                 Header.Tag.string.rawValue,0x80,0])))
+            try XCTAssertThrowsError(decoder.decode([Int].self, from: Data(
+                [0,0,0, Header.Tag.uniformUnkeyed.rawValue,2,2,
+                 Header.Tag.string.rawValue,0x80,0x80])))
         }
+    }
 
-        do {
-            // Wrong Container
-            try XCTAssertThrowsError(decoder.decode([Int].self, from: encoder.encode([2: 3])))
-            try XCTAssertThrowsError(decoder.decode([Int: Int].self, from: encoder.encode(3)))
-        }
+    func testErrorWrongContainers() {
+        // To String
+        try XCTAssertThrowsError(decoder.decode(String.self, from: encoder.encode(0)))
+        try XCTAssertThrowsError(decoder.decode(String.self, from: encoder.encode(0 as UInt)))
+        try XCTAssertThrowsError(decoder.decode(String.self, from: Data([0,0,0, Header.Tag.string.rawValue,1])))
 
-        do {
-            // Encoder
-            try XCTAssertThrowsError(decoder.decode([Int: String].self, from: encoder.encode([1, 2, 3])))
-            try XCTAssertThrowsError(decoder.decode(Int.self, from: encoder.encode([1, 2, 3])))
-            try XCTAssertThrowsError(decoder.decode([Int].self, from: encoder.encode(2)))
-        }
+        // Signed on Unsigned block and vice versa
+        try XCTAssertThrowsError(decoder.decode(Int.self, from: Data([0,0,0, Header.Tag.unsigned.rawValue,0,0,0,0])))
+        try XCTAssertThrowsError(decoder.decode(UInt.self, from: Data([0,0,0, Header.Tag.signed.rawValue,0,0,0,0])))
+
+        // Requesting keyed, unkeyed, and single from different category.
+        try XCTAssertThrowsError(decoder.decode([Int: String].self, from: encoder.encode([1, 2, 3])))
+        try XCTAssertThrowsError(decoder.decode(Int.self, from: encoder.encode([1, 2, 3])))
+        try XCTAssertThrowsError(decoder.decode([Int].self, from: encoder.encode(2)))
     }
 
     static var allTests = [
@@ -398,6 +432,7 @@ final class BinaryCoderTests: XCTestCase {
         ("testNestedUnkeyedContainer", testNestedUnkeyedContainer),
 
         ("testError", testError),
+        ("testErrorWrongContainers", testErrorWrongContainers)
     ]
 }
 

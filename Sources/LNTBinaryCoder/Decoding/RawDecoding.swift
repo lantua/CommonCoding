@@ -31,8 +31,9 @@ extension Header {
 
         switch tag {
         case .nil: self = .nil
-        case .fixedWidth: self = .fixedWidth
-        case .stringReference: self = .stringReference
+        case .signed: self = .signed
+        case .unsigned: self = .unsigned
+        case .string: self = .string
         case .regularKeyed: self = try .regularKeyed(.init(data: &data))
         case .equisizeKeyed: self = try .equisizeKeyed(.init(data: &data))
         case .uniformKeyed: self = try .uniformKeyed(.init(data: &data))

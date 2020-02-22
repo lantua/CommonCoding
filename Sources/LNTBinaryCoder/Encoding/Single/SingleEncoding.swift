@@ -35,14 +35,13 @@ struct SingleValueBinaryEncodingContainer: SingleValueEncodingContainer {
     mutating func encode(_ value: Int) throws { try encode(Int64(value)) }
     mutating func encode(_ value: UInt) throws { try encode(UInt64(value)) }
 
-    mutating func encode<T>(_ value: T) throws where T: Encodable, T: FixedWidthInteger {
-        storage.value = FixedWidthStorage(
-            raw: withUnsafePointer(to: value) {
-                Data(buffer: .init(start: $0, count: 1))
-            }
-        )
+    mutating func encode<T>(_ value: T) throws where T: Encodable, T: FixedWidthInteger, T: SignedInteger {
+        storage.value = SignedStorage(value: value)
     }
-
+    mutating func encode<T>(_ value: T) throws where T: Encodable, T: FixedWidthInteger, T: UnsignedInteger {
+        storage.value = UnsignedStorage(value: value)
+    }
+    
     mutating func encode<T>(_ value: T) throws where T : Encodable {
         try value.encode(to: InternalEncoder(storage: storage, context: context))
     }

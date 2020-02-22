@@ -126,9 +126,7 @@ final class BinaryCoderTests: XCTestCase {
     func testKeyedContainerRoundtrip() {
         do {
             struct Test: Codable, Equatable {
-                enum B: Int, Codable {
-                    case a, b, c
-                }
+                enum B: Int, Codable { case a, b, c }
                 var a: String?, b: B, c: Int
             }
 
@@ -138,7 +136,7 @@ final class BinaryCoderTests: XCTestCase {
 
         do {
             struct Test: Codable, Equatable {
-                var a: Int, b: Int, c: Int, d: Int
+                var a, b, c, d: Int
             }
 
             let value = Test(a: 1, b: 2, c: 3, d: 5)
@@ -147,7 +145,7 @@ final class BinaryCoderTests: XCTestCase {
 
         do {
             struct Test: Codable, Equatable {
-                var a: Int16, b: Int16, c: Int16, d: Int16, e: Int16, f: String
+                var a, b, c, d, e: Int16, f: String
             }
 
             let value = Test(a: 1, b: 2, c: 3, d: 5, e: 2, f: "")

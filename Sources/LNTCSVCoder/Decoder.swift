@@ -107,11 +107,11 @@ private struct CSVKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainer
         return try !context.hasValue(at: schema(forKey: key))
     }
 
-    func decode<T>(_ type: T.Type, forKey key: Key) throws -> T where T: Decodable, T: LosslessStringConvertible {
+    func decode<T>(_: T.Type, forKey key: Key) throws -> T where T: Decodable, T: LosslessStringConvertible {
         return try context.value(at: scope(forKey: key))
     }
 
-    func decode<T>(_ type: T.Type, forKey key: Key) throws -> T where T: Decodable {
+    func decode<T>(_: T.Type, forKey key: Key) throws -> T where T: Decodable {
         return try .init(from: decoder(forKey: key))
     }
 
@@ -167,11 +167,11 @@ private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
         return !hasValue
     }
     
-    mutating func decode<T>(_ type: T.Type) throws -> T where T: Decodable, T: LosslessStringConvertible {
+    mutating func decode<T>(_: T.Type) throws -> T where T: Decodable, T: LosslessStringConvertible {
         return try context.value(at: consumeScope())
     }
     
-    mutating func decode<T>(_ type: T.Type) throws -> T where T: Decodable {
+    mutating func decode<T>(_: T.Type) throws -> T where T: Decodable {
         return try .init(from: consumeDecoder())
     }
 
@@ -189,11 +189,11 @@ private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
 extension CSVInternalDecoder: SingleValueDecodingContainer {
     func decodeNil() -> Bool { return !context.hasValue(at: schema) }
 
-    func decode<T>(_ type: T.Type) throws -> T where T: Decodable, T: LosslessStringConvertible {
+    func decode<T>(_: T.Type) throws -> T where T: Decodable, T: LosslessStringConvertible {
         return try context.value(at: scope)
     }
 
-    func decode<T>(_ type: T.Type) throws -> T where T: Decodable {
+    func decode<T>(_: T.Type) throws -> T where T: Decodable {
         return try .init(from: self)
     }
 }

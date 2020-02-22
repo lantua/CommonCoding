@@ -21,9 +21,7 @@ extension BasicDecodingContainer {
     func decode(_: Bool.Type) throws -> Bool { try decode(UInt8.self) != 0 }
     func decode(_: Float.Type) throws -> Float { try Float(bitPattern: decode(UInt32.self)) }
     func decode(_: Double.Type) throws -> Double { try Double(bitPattern: decode(UInt64.self)) }
-    func decode(_: Int.Type) throws -> Int { try Int(decode(Int64.self)) }
-    func decode(_: UInt.Type) throws -> UInt { try UInt(decode(UInt64.self)) }
-    func decode<T>(_ type: T.Type) throws -> T where T : Decodable {
+    func decode<T>(_: T.Type) throws -> T where T : Decodable {
         try T(from: InternalDecoder(parsed: (header, data), context: context))
     }
 }
@@ -34,7 +32,7 @@ struct NilDecodingContainer: BasicDecodingContainer {
     var header: Header { .nil }
     var data: Data { Data() }
 
-    func decode<T>(_ type: T.Type) throws -> T where T: Decodable, T: FixedWidthInteger {
+    func decode<T>(_: T.Type) throws -> T where T: Decodable, T: FixedWidthInteger {
         throw DecodingError.typeMismatch(T.self, context.error("Nil container found"))
     }
 
@@ -48,9 +46,9 @@ struct SignedDecodingContainer: BasicDecodingContainer {
 
     var header: Header { .signed }
 
-    func decode<T>(_ type: T.Type) throws -> T where T: Decodable, T: FixedWidthInteger {
+    func decode<T>(_: T.Type) throws -> T where T: Decodable, T: FixedWidthInteger {
         guard 0 < data.count else {
-            throw DecodingError.typeMismatch(T.self, context.error("Container is too small"))
+            throw DecodingError.dataCorrupted(context.error("Container is too small"))
         }
 
         guard T.isSigned else {
@@ -80,9 +78,9 @@ struct UnsignedDecodingContainer: BasicDecodingContainer {
 
     var header: Header { .unsigned }
 
-    func decode<T>(_ type: T.Type) throws -> T where T: Decodable, T: FixedWidthInteger {
+    func decode<T>(_: T.Type) throws -> T where T: Decodable, T: FixedWidthInteger {
         guard 0 < data.count else {
-            throw DecodingError.typeMismatch(T.self, context.error("Container is too small"))
+            throw DecodingError.dataCorrupted(context.error("Container is too small"))
         }
 
         guard !T.isSigned else {
@@ -106,7 +104,7 @@ struct StringDecodingContainer: BasicDecodingContainer {
 
     var header: Header { .string }
 
-    func decode<T>(_ type: T.Type) throws -> T where T : Decodable {
+    func decode<T>(_: T.Type) throws -> T where T : Decodable {
         throw DecodingError.typeMismatch(T.self, context.error("String container found"))
     }
 

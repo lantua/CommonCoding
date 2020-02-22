@@ -32,8 +32,6 @@ struct SingleValueBinaryEncodingContainer: SingleValueEncodingContainer {
     mutating func encode(_ value: Bool) throws { try encode(value ? 1 : 0 as UInt8) }
     mutating func encode(_ value: Double) throws { try encode(value.bitPattern) }
     mutating func encode(_ value: Float) throws { try encode(value.bitPattern) }
-    mutating func encode(_ value: Int) throws { try encode(Int64(value)) }
-    mutating func encode(_ value: UInt) throws { try encode(UInt64(value)) }
 
     mutating func encode<T>(_ value: T) throws where T: Encodable, T: FixedWidthInteger, T: SignedInteger {
         storage.value = SignedStorage(value: value)

@@ -10,7 +10,7 @@ import Foundation
 public struct BinaryDecoder {
     public var userInfo: [CodingUserInfoKey: Any] = [:]
 
-    public func decode<T>(_ type: T.Type, from data: Data) throws -> T where T: Decodable {
+    public func decode<T>(_: T.Type, from data: Data) throws -> T where T: Decodable {
         var data = data
         let decoder: InternalDecoder
         do {

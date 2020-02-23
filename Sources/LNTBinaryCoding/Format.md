@@ -82,7 +82,7 @@ This is different from `SingleValueDecodingContainer` and `SingleValueEncodingCo
 
 ### Nil
 
-`nil` is stored as an empty block. If the block is not empty, the first byte will be the tag, `0x01`. 
+`nil` is stored as either an empty block or a non-empty block with the first byte being the tag `0x01`. 
 
 ```
 *--------*
@@ -124,7 +124,7 @@ Types in this category delegates the encoding to another types.
 
 ### String
 
-`String` is stored inside String map, and be refered to from Data storage using (VSUI) index.
+`String` is stored inside String map, and be refered to using (VSUI) index.
 
 ```
 *------*-------*
@@ -150,7 +150,7 @@ This is valid for all containers.
 
 ### Equisized Case
 
-This is valid if all items have the same size.
+This is valid if every item has the same size.
 
 ```
 *--------------------------------------------------*--------------------------------*
@@ -162,7 +162,7 @@ This is valid if all items have the same size.
 
 ### Uniform Case
 
-This is valid if all items have the same size and header.
+This is valid if every item has the same size and header.
 
 ```
 *-----------------------------------------------------------*-----------------------------------------*
@@ -172,9 +172,11 @@ This is valid if all items have the same size and header.
 *-----------------------------------------------------------*-----------------------------------------*
 ```
 
+Note that `Size` referes to the size of the item (with header attached) not the size of the payload.
+
 ## Int-Based Keyed Container
 
-This format does not support `Int`-based keyed container. Keys are converted to `String` and the container is encoded as string-based keyed container.
+This format does not support `Int`-based keyed container. Keys are converted to `String` and the container is encoded as a string-based keyed container.
 
 ## Unkeyed Container
 
@@ -194,7 +196,7 @@ This is valid for all containers.
 
 ### Equisized Case
 
-This is valid if all items have the same size, and the container contains at least one item. If there are more space than needed, last item will be followed by `0x00`.
+This is valid if every item has the same size.
 
 ```
 *---------------------*--------------------------------*
@@ -206,7 +208,7 @@ This is valid if all items have the same size, and the container contains at lea
 
 ### Uniform Case
 
-This is valid if all items have the same size and header.
+This is valid if every item has the same size and header.
 
 ```
 *------------------------------*-----------------------------------------*
@@ -222,21 +224,23 @@ Note that `Size` referes to the size of the item (with header attached) not the 
 
 ## Padding
 
-This format is designed specifically to allow padding at the end of the data. It uses an *endpoint marker* anywhere the boundary between data and the padding is ambiguous.
+This format is designed specifically to allow padding at the end of the data.
 
-For keyed and unkeyed containers, this also allows payloads with different sizes to be padded to make the containers eligible for equisized form.
+For keyed and unkeyed containers, this allows payloads with different sizes to be padded to make the containers eligible for equisized and uniform forms.
 
-## Values of Tags
+## Reserved Values
 
-The *tags* of objects can not be `0x00`. Some containers used `0x00` as endpoint markers where tags would be should there be more items.
+The tag `0x00` and the string index `0x00` are reserved. It can serve as an endpoint marker should we add support for formats that doesn't know the number of items up front.
 
-We should also reserve some tags (`0x80` - `0xff`) for when the tag space is filled up. At which point we can still use them as a head for multi-byte tags.
+We also reserve *high value* tags (`0x80` - `0xff`) for when the tag space is filled up. At which point we can use them as a head for multi-byte tags.
 
-## Size of Item
+## Size of an Item
 
-It is possible to avoid using object of size 1 altogether. `nil` object can be encoded as empty block, and all other objects requires at least 2 bytes (1 for tag, 1 for data). As such, some containers uses `0x01` as an endpoint marker as its location overlapped where `Size` would be. One reason this would be problematic is if we add another data-less type.
+It is possible to avoid using object of size 1 altogether. `nil` object can be encoded as empty block, and all other objects requires at least 2 bytes (1 for tag, 1 for data). As such, some containers uses `0x01` as a marker that a list of valid size has ended.
 
-One alternative would be to have `nil` use exactly 1 byte, and use `0x00` as the endpoint, but having `nil` be 0 byte saves more space without much sacrifice in performance.
+One reason this would be problematic is if we add another data-less type. There are some good candidates, such as empty signed/unsigned containers, which can be interpreted as zero.
+
+One alternative would be to have `nil` use exactly 1 byte, and use `0x00` as the marker, but having `nil` be 0 byte saves more space without much sacrifice in performance.
 
 ## Uniqueness of VSUI
 
@@ -252,4 +256,4 @@ and so on. This is intentional as it allows the encoder to make a trade-off betw
 
 ## Non-overlapping Rule
 
-The data storage employs non-overlapping rule. As such, the size of an object can be calculated using the position of the next object (and of the current object).
+The data storage employs non-overlapping rule. As such, the size of an object can be calculated using the position of the next object (and the position of the current object).

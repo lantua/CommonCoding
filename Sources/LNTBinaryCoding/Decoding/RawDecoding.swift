@@ -7,15 +7,6 @@
 
 import Foundation
 
-extension Data {
-    subscript(offset range: Range<Int>) -> Data {
-        assert(count >= range.upperBound)
-        let lower = index(startIndex, offsetBy: range.lowerBound)
-        let upper = index(startIndex, offsetBy: range.upperBound)
-        return self[lower..<upper]
-    }
-}
-
 extension Header {
     /// Extract header from data, and remove the header portion.
     init(data: inout Data) throws {
@@ -59,6 +50,16 @@ extension Data {
             result |= Int(first) & (1<<7 - 1)
         } while first & 1<<7 != 0
 
+        return result
+    }
+
+    func readFixedWidth<T>(_: T.Type) -> T where T: FixedWidthInteger {
+        assert(count >= T.bitWidth / 8)
+
+        var result: T = 0
+        Swift.withUnsafeMutableBytes(of: &result) { raw in
+            raw.copyBytes(from: prefix(T.bitWidth / 8))
+        }
         return result
     }
 

@@ -30,7 +30,7 @@ public struct BinaryEncoder {
         let temp = TempSingleValueStorage()
         
         let encodingContext = EncodingContext(userInfo: userInfo)
-        let encoder = InternalEncoder(storage: temp, context: encodingContext)
+        let encoder = InternalEncoder(context: encodingContext, storage: temp)
         try value.encode(to: encoder)
 
         let strings = encodingContext.optimize()

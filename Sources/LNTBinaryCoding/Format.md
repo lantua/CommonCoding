@@ -94,26 +94,24 @@ This is different from `SingleValueDecodingContainer` and `SingleValueEncodingCo
 
 Types in this category include `Int`, `Int8`, `Int16`, `Int32`, `Int64`. It is stored as a tag followed by the payload in little endian byte order.
 
-If the payload is shorter than the expected type (storing `Int64` on a three-byte space), the remaining byte follows the sign bit of the last byte. 
-If the payload is longer than the expected type (storing `Int64` on a five-byte space), the unused bytes, up to 16 bytes including the payload, are set to follow the signs of the last byte.  
+This format uses the largest type that fits the payload. For example, if the payload is five-byte long, it will use `Int32`.
 
 ```
-*--------------------------*
-| 0x02 | Data | (sign) ... |
-*--------------------------*
+*-------------*
+| 0x02 | Data |
+*-------------*
 ```
 
 ### Unsigned Integer Types
 
 Types in this category include `UInt`, `UInt8`, `UInt16`, `UInt32`, `UInt64`. It is stored as a tag followed by the payload in little endian byte order.
 
-If the payload is shorter than the expected type (storing `UInt64` on a three-byte space), the remaining bytes are treated as zero. 
-If the payload is longer than the expected type (storing `UInt64` on a five-byte space), the unused bytes, up to 16 bytes including the payload, are set to zero.  
+This format uses the largest type that fits the payload. For example, if the payload is five-byte long, it will use `UInt32`.
 
 ```
-*--------------------------*
-| 0x03 | Data | (0x00) ... |
-*--------------------------*
+*-------------*
+| 0x03 | Data |
+*-------------*
 ```
 
 ### Delegating Types
@@ -199,11 +197,11 @@ This is valid for all containers.
 This is valid if all items have the same size, and the container contains at least one item. If there are more space than needed, last item will be followed by `0x00`.
 
 ```
-*-------------*-----------------------------------------*
-|    Header   |                 Payload                 |
-*-------------*-----------------------------------------*
-| 0x21 | Size | Item 1 | Item 2 | ... | Item n | (0x00) |
-*-------------*-----------------------------------------*
+*---------------------*--------------------------------*
+|        Header       |             Payload            |
+*---------------------*--------------------------------*
+| 0x21 | Size | Count | Item 1 | Item 2 | ... | Item n |
+*---------------------*--------------------------------*
 ```
 
 ### Uniform Case

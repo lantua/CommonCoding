@@ -31,7 +31,7 @@ struct UnkeyedBinaryEncodingContainer: UnkeyedEncodingContainer {
     mutating func encodeNil() throws { storage.values.append(NilStorage()) }
 
     mutating func encode<T>(_ value: T) throws where T: Encodable {
-        try value.encode(to: InternalEncoder(storage: register(.init()), context: context.appending(UnkeyedCodingKey(intValue: count))))
+        try value.encode(to: InternalEncoder(context: context.appending(UnkeyedCodingKey(intValue: count)), storage: register(.init())))
     }
 
     mutating func nestedContainer<NestedKey>(keyedBy _: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> where NestedKey : CodingKey {
@@ -43,6 +43,6 @@ struct UnkeyedBinaryEncodingContainer: UnkeyedEncodingContainer {
     }
 
     mutating func superEncoder() -> Encoder {
-        InternalEncoder(storage: register(.init()), context: context.appending(UnkeyedCodingKey(intValue: count)))
+        InternalEncoder(context: context.appending(UnkeyedCodingKey(intValue: count)), storage: register(.init()))
     }
 }

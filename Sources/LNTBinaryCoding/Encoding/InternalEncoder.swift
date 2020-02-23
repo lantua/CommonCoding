@@ -13,7 +13,7 @@ class InternalEncoder: Encoder {
     var userInfo: [CodingUserInfoKey : Any] { context.userInfo }
     var codingPath: [CodingKey] { context.codingPath }
 
-    init(storage: TempSingleValueStorage, context: EncodingContext) {
+    init(context: EncodingContext, storage: TempSingleValueStorage) {
         self.storage = storage
         self.context = context
     }

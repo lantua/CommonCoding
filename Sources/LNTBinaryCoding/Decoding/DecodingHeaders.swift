@@ -22,7 +22,7 @@ extension RegularKeyedHeader {
     }
 }
 
-extension EquisizedKeyedHeader {
+extension EquisizeKeyedHeader {
     init(data: inout Data) throws {
         var keys: [Int] = []
 
@@ -40,7 +40,7 @@ extension EquisizedKeyedHeader {
 
 extension UniformKeyedHeader {
     init(data: inout Data) throws {
-        let size = try data.readInteger()
+        let itemSize = try data.readInteger()
 
         var keys: [Int] = []
         var keyIndex = try data.readInteger()
@@ -51,7 +51,7 @@ extension UniformKeyedHeader {
 
         let header = try Header(data: &data)
 
-        self.size = size
+        self.itemSize = itemSize
         self.subheader = header
         self.keys = keys
     }
@@ -73,12 +73,13 @@ extension RegularUnkeyedHeader {
 extension EquisizedUnkeyedHeader {
     init(data: inout Data) throws {
         size = try data.readInteger()
+        count = try data.readInteger()
     }
 }
 
 extension UniformUnkeyedHeader {
     init(data: inout Data) throws {
-        size = try data.readInteger()
+        itemSize = try data.readInteger()
         count  = try data.readInteger()
         subheader = try Header(data: &data)
     }

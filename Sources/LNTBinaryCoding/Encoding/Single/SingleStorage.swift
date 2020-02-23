@@ -16,67 +16,45 @@ struct NilStorage: EncodingStorage {
     func writePayload(to data: Slice<UnsafeMutableRawBufferPointer>) { }
 }
 
-struct SignedStorage: EncodingStorage {
-    let raw: Data
+struct IntegerStorage<Value>: EncodingStorage where Value: FixedWidthInteger {
+    let value: Value
 
-    var header: Header { .signed }
-    var payloadSize: Int { raw.count }
-
-    init<T>(value: T) where T: FixedWidthInteger, T: SignedInteger {
-        let isNegative = value < 0, end = isNegative ? -1 : 0
-        var value = value, raw = Data()
-        var canEnd: Bool
-
-        repeat {
-            canEnd = (value & 0x80 != 0) == isNegative
-            raw.append(UInt8(value & 0xff))
-            value >>= 8
-        } while value != end || !canEnd
-        self.raw = raw
-    }
+    var header: Header { Value.isSigned ? .signed : .unsigned }
+    var payloadSize: Int { value.bitWidth / 8 }
 
     func optimize(for context: OptimizationContext) { }
 
     func writePayload(to data: Slice<UnsafeMutableRawBufferPointer>) {
-        assert(data.count >= raw.count)
+        assert(data.count >= payloadSize)
 
-        let sign = data.last! & 0x80 != 0
-
-        raw.copyBytes(to: UnsafeMutableRawBufferPointer(rebasing: data))
-
-        let unused = data.prefix(16).dropFirst(raw.count)
-        UnsafeMutableRawBufferPointer(rebasing: unused)
-            .copyBytes(from: repeatElement(sign ? 0xff : 0x00, count: unused.count))
+        value.writeFixedWidth(to: data)
     }
 }
 
-struct UnsignedStorage: EncodingStorage {
-    let raw: Data
-
-    var header: Header { .unsigned }
-    var payloadSize: Int { raw.count }
-
-    init<T>(value: T) where T: FixedWidthInteger, T: UnsignedInteger {
-        var value = value, raw = Data()
-
-        repeat {
-            raw.append(UInt8(value & 0xff))
-            value >>= 8
-        } while value != 0
-        self.raw = raw
+func signedStorage<T>(value: T) -> EncodingStorage where T: FixedWidthInteger, T: SignedInteger {
+    if let value = Int8(exactly: value) {
+        return IntegerStorage(value: value)
     }
-
-    func optimize(for context: OptimizationContext) { }
-
-    func writePayload(to data: Slice<UnsafeMutableRawBufferPointer>) {
-        assert(data.count >= raw.count)
-
-        raw.copyBytes(to: UnsafeMutableRawBufferPointer(rebasing: data))
-
-        let unused = data.prefix(16).dropFirst(raw.count)
-        UnsafeMutableRawBufferPointer(rebasing: unused)
-            .copyBytes(from: repeatElement(0, count: unused.count))
+    if let value = Int16(exactly: value) {
+        return IntegerStorage(value: value)
     }
+    if let value = Int32(exactly: value) {
+        return IntegerStorage(value: value)
+    }
+    return IntegerStorage(value: value)
+}
+
+func unsignedStorage<T>(value: T) -> EncodingStorage where T: FixedWidthInteger, T: UnsignedInteger {
+    if let value = UInt8(exactly: value) {
+        return IntegerStorage(value: value)
+    }
+    if let value = UInt16(exactly: value) {
+        return IntegerStorage(value: value)
+    }
+    if let value = UInt32(exactly: value) {
+        return IntegerStorage(value: value)
+    }
+    return IntegerStorage(value: value)
 }
 
 struct StringStorage: EncodingStorage {

@@ -22,34 +22,16 @@ struct OptimizationContext {
 }
 
 func uniformize<C>(values: C) -> (elementSize: Int, header: Header)? where C: Collection, C.Element == EncodingStorage {
-    var tag: Header.Tag?
-
-    for value in values {
-        var current: Header.Tag
-        switch value {
-        case is NilStorage: current = .nil
-        case is SignedStorage: current = .signed
-        case is UnsignedStorage: current = .unsigned
-        case is StringStorage: current = .string
-        default: return nil // Unsupported types
-        }
-
-        if tag == nil {
-            tag = current
-        }
-
-        guard tag == current else {
-            // Non-uniform array
+    guard let tag = values.first?.header.tag,
+        values.dropFirst().allSatisfy({ $0.header.tag == tag }) else {
             return nil
-        }
     }
 
     switch tag {
-    case nil: return nil
     case .nil: return (0, .nil)
     case .signed: return (values.lazy.map { $0.size }.reduce(0, max), .signed)
     case .unsigned: return (values.lazy.map { $0.size }.reduce(0, max), .unsigned)
     case .string: return (values.lazy.map { $0.size }.reduce(0, max), .string)
-    default: fatalError("Unreachable")
+    default: return nil // Unsupported types
     }
 }

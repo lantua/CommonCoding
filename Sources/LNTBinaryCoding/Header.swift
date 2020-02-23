@@ -11,38 +11,46 @@ enum Header {
     case `nil`, string
     case signed, unsigned
     case regularKeyed(RegularKeyedHeader), regularUnkeyed(RegularUnkeyedHeader)
-    case equisizeKeyed(EquisizedKeyedHeader), equisizeUnkeyed(EquisizedUnkeyedHeader)
+    case equisizeKeyed(EquisizeKeyedHeader), equisizeUnkeyed(EquisizedUnkeyedHeader)
     indirect case uniformKeyed(UniformKeyedHeader), uniformUnkeyed(UniformUnkeyedHeader)
 }
 
 struct RegularKeyedHeader {
     var mapping: [(key: Int, size: Int)]
+
+    var totalPayloadSize: Int { mapping.lazy.map { $0.size }.reduce(0, +) }
 }
 
-struct EquisizedKeyedHeader {
+struct EquisizeKeyedHeader {
     var size: Int, keys: [Int]
 
-    var payloadSize: Int { size * keys.count }
+    var totalPayloadSize: Int { size * keys.count }
 }
 
 struct UniformKeyedHeader {
-    var size: Int, subheader: Header, keys: [Int]
+    var itemSize: Int, subheader: Header, keys: [Int]
 
-    var payloadSize: Int { (size - subheader.size) * keys.count }
+    var payloadSize: Int { itemSize - subheader.size }
+    var totalPayloadSize: Int { (itemSize - subheader.size) * keys.count }
 }
 
 struct RegularUnkeyedHeader {
     var sizes: [Int]
+
+    var totalPayloadSize: Int { sizes.reduce(0, +) }
 }
 
 struct EquisizedUnkeyedHeader {
-    var size: Int
+    var size: Int, count: Int
+
+    var totalPayloadSize: Int { size * count }
 }
 
 struct UniformUnkeyedHeader {
-    var size: Int, subheader: Header, count: Int
+    var itemSize: Int, subheader: Header, count: Int
 
-    var payloadSize: Int { (size - subheader.size) * count }
+    var payloadSize: Int { itemSize - subheader.size }
+    var totalPayloadSize: Int { payloadSize * count }
 }
 
 extension Header {
@@ -50,8 +58,6 @@ extension Header {
         case `nil` = 0x1, signed = 0x2, unsigned = 0x3, string = 0x4
         case regularKeyed = 0x10, equisizeKeyed, uniformKeyed
         case regularUnkeyed = 0x20, equisizeUnkeyed, uniformUnkeyed
-
-        static var terminator: UInt8 { 0x00 }
     }
 
     var tag: Tag {

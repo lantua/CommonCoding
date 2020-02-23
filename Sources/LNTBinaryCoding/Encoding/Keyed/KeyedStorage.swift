@@ -66,7 +66,7 @@ struct KeyedStorage: EncodingStorage {
                 data.removeFirst(size)
             }
         case let .uniformKeyed(header):
-            let size = header.size - header.subheader.size
+            let size = header.payloadSize
             for value in values.values {
                 value.writePayload(to: data.prefix(size))
                 data.removeFirst(size)
@@ -92,6 +92,6 @@ private extension KeyedStorage {
             return nil
         }
 
-        return (.uniformKeyed(.init(size: elementSize, subheader: subheader, keys: keys)), (elementSize - subheader.size) * keys.count)
+        return (.uniformKeyed(.init(itemSize: elementSize, subheader: subheader, keys: keys)), (elementSize - subheader.size) * keys.count)
     }
 }

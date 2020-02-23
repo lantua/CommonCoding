@@ -8,8 +8,8 @@
 import Foundation
 
 struct UnkeyedStorage: EncodingStorage {
-    private var values: [EncodingStorage]
     var header = Header.nil
+    private var values: [EncodingStorage]
     private(set) var payloadSize = 0
 
     init(values: [EncodingStorage]) {
@@ -49,29 +49,26 @@ struct UnkeyedStorage: EncodingStorage {
         var data = data
 
         switch header {
-        case .regularUnkeyed:
-            for value in values {
-                let size = value.size
-                value.write(to: data.prefix(size))
-                data.removeFirst(size)
-            }
         case let .equisizeUnkeyed(header):
             let size = header.size
             for value in values {
                 value.write(to: data.prefix(size))
                 data.removeFirst(size)
             }
-
-            if !data.isEmpty {
-                data[data.startIndex] = Header.Tag.terminator
-            }
         case let .uniformUnkeyed(header):
-            let size = header.size - header.subheader.size
+            let size = header.itemSize - header.subheader.size
             for value in values {
                 value.writePayload(to: data.prefix(size))
                 data.removeFirst(size)
             }
-        default: fatalError("Unreachable")
+        default:
+            assert(header.tag == .regularUnkeyed)
+
+            for value in values {
+                let size = value.size
+                value.write(to: data.prefix(size))
+                data.removeFirst(size)
+            }
         }
     }
 }
@@ -88,14 +85,14 @@ private extension UnkeyedStorage {
         guard maxSize > 0 else {
             return nil
         }
-        return (.equisizeUnkeyed(.init(size: maxSize)), maxSize * values.count)
+        return (.equisizeUnkeyed(.init(size: maxSize, count: values.count)), maxSize * values.count)
     }
 
     func uniformSize() -> (header: Header, payload: Int)? {
-        guard let (elementSize, subheader) = uniformize(values: values) else {
+        guard let (itemSize, subheader) = uniformize(values: values) else {
             return nil
         }
 
-        return (.uniformUnkeyed(.init(size: elementSize, subheader: subheader, count: values.count)), (elementSize - subheader.size) * values.count)
+        return (.uniformUnkeyed(.init(itemSize: itemSize, subheader: subheader, count: values.count)), (itemSize - subheader.size) * values.count)
     }
 }

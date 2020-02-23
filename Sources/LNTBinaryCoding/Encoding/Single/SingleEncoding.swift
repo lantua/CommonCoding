@@ -34,13 +34,13 @@ struct SingleValueBinaryEncodingContainer: SingleValueEncodingContainer {
     mutating func encode(_ value: Float) throws { try encode(value.bitPattern) }
 
     mutating func encode<T>(_ value: T) throws where T: Encodable, T: FixedWidthInteger, T: SignedInteger {
-        storage.value = SignedStorage(value: value)
+        storage.value = signedStorage(value: value)
     }
     mutating func encode<T>(_ value: T) throws where T: Encodable, T: FixedWidthInteger, T: UnsignedInteger {
-        storage.value = UnsignedStorage(value: value)
+        storage.value = unsignedStorage(value: value)
     }
     
     mutating func encode<T>(_ value: T) throws where T : Encodable {
-        try value.encode(to: InternalEncoder(storage: storage, context: context))
+        try value.encode(to: InternalEncoder(context: context, storage: storage))
     }
 }

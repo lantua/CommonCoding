@@ -34,7 +34,7 @@ struct KeyedBinaryEncodingContainer<Key>: KeyedEncodingContainerProtocol where K
     }
 
     mutating func encode<T>(_ value: T, forKey key: Key) throws where T : Encodable {
-        try value.encode(to: InternalEncoder(storage: register(key: key, value: .init()), context: context.appending(key)))
+        try value.encode(to: InternalEncoder(context: context.appending(key), storage: register(key: key, value: .init())))
     }
 
     mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> where NestedKey : CodingKey {
@@ -46,10 +46,10 @@ struct KeyedBinaryEncodingContainer<Key>: KeyedEncodingContainerProtocol where K
     }
 
     mutating func superEncoder() -> Encoder {
-        InternalEncoder(storage: register(key: SuperCodingKey(), value: .init()), context: context.appending(SuperCodingKey()))
+        InternalEncoder(context: context.appending(SuperCodingKey()), storage: register(key: SuperCodingKey(), value: .init()))
     }
 
     mutating func superEncoder(forKey key: Key) -> Encoder {
-        InternalEncoder(storage: register(key: key, value: .init()), context: context.appending(key))
+        InternalEncoder(context: context.appending(key), storage: register(key: key, value: .init()))
     }
 }

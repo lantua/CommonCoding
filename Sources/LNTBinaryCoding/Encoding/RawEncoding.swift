@@ -18,13 +18,13 @@ extension Header {
         case let .equisizeKeyed(header):
             return 2 + header.size.vsuiSize + header.keys.lazy.map { $0.vsuiSize }.reduce(0, +)
         case let .uniformKeyed(header):
-            return 2 + header.size.vsuiSize + header.subheader.size + header.keys.lazy.map { $0.vsuiSize }.reduce(0, +)
+            return 2 + header.itemSize.vsuiSize + header.subheader.size + header.keys.lazy.map { $0.vsuiSize }.reduce(0, +)
         case let .regularUnkeyed(header):
             return 2 + header.sizes.lazy.map { $0.vsuiSize }.reduce(0, +)
         case let .equisizeUnkeyed(header):
-            return 1 + header.size.vsuiSize
+            return 1 + header.size.vsuiSize + header.count.vsuiSize
         case let .uniformUnkeyed(header):
-            return 1 + header.size.vsuiSize + header.subheader.size + header.count.vsuiSize
+            return 1 + header.itemSize.vsuiSize + header.subheader.size + header.count.vsuiSize
         }
     }
 
@@ -58,7 +58,7 @@ extension Header {
             }
             append(0x00)
         case let .uniformKeyed(header):
-            header.size.write(to: &data)
+            header.itemSize.write(to: &data)
             for key in header.keys {
                 key.write(to: &data)
             }
@@ -71,8 +71,9 @@ extension Header {
             append(0x01)
         case let .equisizeUnkeyed(header):
             header.size.write(to: &data)
+            header.count.write(to: &data)
         case let .uniformUnkeyed(header):
-            header.size.write(to: &data)
+            header.itemSize.write(to: &data)
             header.count.write(to: &data)
             header.subheader.write(to: &data)
         }
@@ -104,5 +105,15 @@ extension Int {
         assert(value == 0)
         
         data.removeFirst(size)
+    }
+}
+
+extension FixedWidthInteger {
+    func writeFixedWidth(to data: Slice<UnsafeMutableRawBufferPointer>) {
+        assert(bitWidth / 8 <= data.count)
+        
+        withUnsafeBytes(of: self) { raw in
+            UnsafeMutableRawBufferPointer(rebasing: data).copyMemory(from: raw)
+        }
     }
 }

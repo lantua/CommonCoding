@@ -9,11 +9,17 @@ import Foundation
 
 typealias HeaderData = (header: Header, data: Data)
 
-struct InternalDecoder: Decoder {
-    let header: Header, data: Data, context: DecodingContext
+private enum ContainerType {
+    case singleValue(SingleValueDecodingContainer)
+    case unkeyed(UnkeyedDecodingContainer)
+    case stringKeyed(StringKeyedDecodingContainer)
+}
 
-    init(parsed: HeaderData, context: DecodingContext) {
-        (header, data) = parsed
+struct InternalDecoder: Decoder {
+    private let container: ContainerType, context: DecodingContext
+
+    init(container: SingleValueDecodingContainer, context: DecodingContext) {
+        self.container = .singleValue(container)
         self.context = context
     }
 
@@ -21,43 +27,50 @@ struct InternalDecoder: Decoder {
     var codingPath: [CodingKey] { context.codingPath }
 
     func container<Key>(keyedBy type: Key.Type) throws -> KeyedDecodingContainer<Key> where Key : CodingKey {
-        do {
-            switch header {
-            case let .regularKeyed(header): return try .init(NonUniformKeyedDecodingContainer(header: header, data: data, context: context))
-            case let .equisizeKeyed(header): return try .init(NonUniformKeyedDecodingContainer(header: header, data: data, context: context))
-            case let .uniformKeyed(header): return try .init(UniformKeyedDecodingContainer(header: header, data: data, context: context))
-            default: break
-            }
-        } catch {
-            throw DecodingError.dataCorrupted(context.error(error: error))
+        guard case let .stringKeyed(container) = container else {
+            throw DecodingError.typeMismatch(KeyedDecodingContainer<Key>.self, context.error("Requesting from an incompatible container"))
         }
-        throw DecodingError.typeMismatch(KeyedDecodingContainer<Key>.self, context.error("Requesting from a \(header.tag) block"))
+
+        return .init(KeyedBinaryDecodingContainer(container: container))
     }
 
     func unkeyedContainer() throws -> UnkeyedDecodingContainer {
-        do {
-            switch header {
-            case let .regularUnkeyed(header): return try RegularUnkeyedDecodingContainer(header: header, data: data, context: context)
-            case let .equisizeUnkeyed(header): return EquisizedUnkeyedDecodingContainer(header: header, data: data, context: context)
-            case let .uniformUnkeyed(header): return try UniformUnkeyedDecodingContainer(header: header, data: data, context: context)
-
-            default: break
-            }
-        } catch {
-            throw DecodingError.dataCorrupted(context.error(error: error))
+        guard case let .unkeyed(container) = container else {
+            throw DecodingError.typeMismatch(UnkeyedDecodingContainer.self, context.error("Requesting from an incompatible container"))
         }
-        throw DecodingError.typeMismatch(UnkeyedDecodingContainer.self, context.error("Requesting from a \(header.tag) block"))
+
+        return container
     }
 
     func singleValueContainer() throws -> SingleValueDecodingContainer {
-        switch header {
-        case .signed: return SignedDecodingContainer(data: data, context: context)
-        case .unsigned: return UnsignedDecodingContainer(data: data, context: context)
-        case .nil: return NilDecodingContainer(context: context)
-        case .string: return StringDecodingContainer(data: data, context: context)
+        guard case let .singleValue(container) = container else {
+            throw DecodingError.typeMismatch(SingleValueDecodingContainer.self, context.error("Requesting from an incompatible container"))
+        }
 
-        default:
-            throw DecodingError.typeMismatch(SingleValueDecodingContainer.self, context.error("Requesting from a \(header.tag) block"))
+        return container
+    }
+}
+
+extension InternalDecoder {
+    init(parsed: HeaderData, context: DecodingContext) throws {
+        self.context = context
+
+        do {
+            let (header, data) = parsed
+            switch header {
+            case .nil: container = .singleValue(NilDecodingContainer(context: context))
+            case .signed: container = try .singleValue(signedDecodingContainer(data: data, context: context))
+            case .unsigned: container = try .singleValue(unsignedDecodingContainer(data: data, context: context))
+            case .string: container = .singleValue(StringDecodingContainer(data: data, context: context))
+            case let .regularKeyed(header): container = try .stringKeyed(.init(header: header, data: data, context: context))
+            case let .equisizeKeyed(header): container = try .stringKeyed(.init(header: header, data: data, context: context))
+            case let .uniformKeyed(header): container = try .stringKeyed(.init(header: header, data: data, context: context))
+            case let .regularUnkeyed(header): self.container = try .unkeyed(UnkeyedBinaryDecodingContainer(header: header, data: data, context: context))
+            case let .equisizeUnkeyed(header): self.container = try .unkeyed(UnkeyedBinaryDecodingContainer(header: header, data: data, context: context))
+            case let .uniformUnkeyed(header): self.container = try .unkeyed(UnkeyedBinaryDecodingContainer(header: header, data: data, context: context))
+            }
+        } catch {
+            throw DecodingError.dataCorrupted(context.error(error: error))
         }
     }
 }

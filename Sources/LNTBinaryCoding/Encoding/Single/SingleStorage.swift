@@ -27,7 +27,7 @@ struct IntegerStorage<Value>: EncodingStorage where Value: FixedWidthInteger {
     func writePayload(to data: Slice<UnsafeMutableRawBufferPointer>) {
         assert(data.count >= payloadSize)
 
-        value.writeFixedWidth(to: data)
+        value.littleEndian.writeFixedWidth(to: data)
     }
 }
 

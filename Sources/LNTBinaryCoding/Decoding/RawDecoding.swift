@@ -60,7 +60,7 @@ extension Data {
         Swift.withUnsafeMutableBytes(of: &result) { raw in
             raw.copyBytes(from: prefix(T.bitWidth / 8))
         }
-        return result
+        return .init(littleEndian: result)
     }
 
     /// Read null-terminated utf8 string from the data, and remove the read portion.

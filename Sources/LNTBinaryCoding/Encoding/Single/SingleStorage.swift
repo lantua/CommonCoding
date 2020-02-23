@@ -27,7 +27,21 @@ struct IntegerStorage<Value>: EncodingStorage where Value: FixedWidthInteger {
     func writePayload(to data: Slice<UnsafeMutableRawBufferPointer>) {
         assert(data.count >= payloadSize)
 
-        value.littleEndian.writeFixedWidth(to: data)
+        if Value.isSigned {
+            switch data.count {
+            case 1..<2: Int8(value).littleEndian.writeFixedWidth(to: data)
+            case 2..<4: Int16(value).littleEndian.writeFixedWidth(to: data)
+            case 4..<8: Int32(value).littleEndian.writeFixedWidth(to: data)
+            default: Int64(value).littleEndian.writeFixedWidth(to: data)
+            }
+        } else {
+            switch data.count {
+            case 1..<2: UInt8(value).littleEndian.writeFixedWidth(to: data)
+            case 2..<4: UInt16(value).littleEndian.writeFixedWidth(to: data)
+            case 4..<8: UInt32(value).littleEndian.writeFixedWidth(to: data)
+            default: UInt64(value).littleEndian.writeFixedWidth(to: data)
+            }
+        }
     }
 }
 

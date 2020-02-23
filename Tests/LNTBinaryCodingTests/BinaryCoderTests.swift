@@ -150,30 +150,32 @@ final class BinaryCodingTests: XCTestCase {
     func testDecoder() throws {
         try XCTAssertNil(decoder.decode(Int?.self, from: Data([0,0,0])))
 
-        /// Keyed containers will picked latter values.
-        try XCTAssertEqual(decoder.decode([String: Int8].self, from: Data(
-            [0,0,
-             1,Character("a").asciiValue!,0,
-             Header.Tag.regularKeyed.rawValue, 2,1, 2,1, 0x1,
-             1,0,
-             2,1
-        ])), ["a": 1])
-        try XCTAssertEqual(decoder.decode([String: Int8].self, from: Data(
-            [0,0,
-             1,Character("a").asciiValue!,0,
-             Header.Tag.equisizeKeyed.rawValue, 2, 1,1,0x0,
-             1,0,
-             2,1
-        ])), ["a": 1])
-        try XCTAssertEqual(decoder.decode([String: Int8].self, from: Data(
-            [0,0,
-             1,Character("a").asciiValue!,0,
-             Header.Tag.uniformKeyed.rawValue, 2, 1,1,0x0, Header.Tag.signed.rawValue,
-             2,
-             1
-        ])), ["a": 1])
+        // Keyed containers will picked latter values.
+        do {
+            try XCTAssertEqual(decoder.decode([String: Int8].self, from: Data(
+                [0,0,
+                 1,Character("a").asciiValue!,0,
+                 Header.Tag.regularKeyed.rawValue, 2,1, 2,1, 0x1,
+                 1,0,
+                 2,1
+            ])), ["a": 1])
+            try XCTAssertEqual(decoder.decode([String: Int8].self, from: Data(
+                [0,0,
+                 1,Character("a").asciiValue!,0,
+                 Header.Tag.equisizeKeyed.rawValue, 2, 1,1,0x0,
+                 1,0,
+                 2,1
+            ])), ["a": 1])
+            try XCTAssertEqual(decoder.decode([String: Int8].self, from: Data(
+                [0,0,
+                 1,Character("a").asciiValue!,0,
+                 Header.Tag.uniformKeyed.rawValue, 2, 1,1,0x0, Header.Tag.signed.rawValue,
+                 2,
+                 1
+            ])), ["a": 1])
+        }
 
-        /// Uniform unkeyed container of `nil`
+        // Uniform unkeyed container of `nil`
         do {
             let data = try encoder.encode(Array(repeating: nil as Int?, count: 10))
 
@@ -188,6 +190,20 @@ final class BinaryCodingTests: XCTestCase {
             }
 
             try _ = decoder.decode(A.self, from: data)
+        }
+
+        // Conding fixed width of differing sizes
+        do {
+            struct A: Encodable {
+                func encode(to encoder: Encoder) throws {
+                    var container = encoder.unkeyedContainer()
+                    try container.encode(-10 as Int8)
+                    try container.encode(200 as Int16)
+                    try container.encode(201 as Int16)
+                }
+            }
+
+            try XCTAssertEqual(decoder.decode([Int].self, from: encoder.encode(A())), [-10, 200, 201])
         }
     }
 
@@ -305,8 +321,8 @@ final class BinaryCodingTests: XCTestCase {
         try XCTAssertThrowsError(decoder.decode(Int.self, from: Data([0,0,0,])))
         try XCTAssertThrowsError(decoder.decode(String.self, from: Data([0,0,0,])))
 
+        // Past the end
         do {
-            // Past the end
             struct A: Codable {
                 init() { }
                 init(from decoder: Decoder) throws {
@@ -346,6 +362,7 @@ final class BinaryCodingTests: XCTestCase {
             struct B: Codable { var a = 0, c = "" }
             try XCTAssertThrowsError(decoder.decode(A.self, from: encoder.encode(B())))
         }
+
         // Key not found - Uniform
         do {
             struct A: Codable { var a = 0, b = 0, c = 0, d = 0, e = 0, f = 0 }
@@ -369,8 +386,8 @@ final class BinaryCodingTests: XCTestCase {
             [0,0,0, Header.Tag.uniformUnkeyed.rawValue,2,2,
              Header.Tag.string.rawValue,0x80,0x80])))
 
+        // Invalid element while `decodeNil`
         do {
-            // Invalid element while `decodeNil`
             struct A: Decodable {
                 init(from decoder: Decoder) throws {
                     var container = try decoder.unkeyedContainer()

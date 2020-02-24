@@ -12,25 +12,25 @@ struct SingleValueBinaryEncodingContainer: SingleValueEncodingContainer {
 
     var codingPath: [CodingKey] { context.codingPath }
 
-    mutating func encodeNil() throws { parent.register(NilStorage()) }
+    func encodeNil() throws { parent.register(NilStorage()) }
 
-    mutating func encode(_ value: String) throws {
+    func encode(_ value: String) throws {
         context.register(string: value)
         parent.register(StringStorage(string: value))
     }
 
-    mutating func encode(_ value: Bool) throws { try encode(value ? 1 : 0 as UInt8) }
-    mutating func encode(_ value: Double) throws { try encode(value.bitPattern) }
-    mutating func encode(_ value: Float) throws { try encode(value.bitPattern) }
+    func encode(_ value: Bool) throws { try encode(value ? 1 : 0 as UInt8) }
+    func encode(_ value: Double) throws { try encode(value.bitPattern) }
+    func encode(_ value: Float) throws { try encode(value.bitPattern) }
 
-    mutating func encode<T>(_ value: T) throws where T: Encodable, T: FixedWidthInteger, T: SignedInteger {
+    func encode<T>(_ value: T) throws where T: Encodable, T: FixedWidthInteger, T: SignedInteger {
         parent.register(signedStorage(value: value))
     }
-    mutating func encode<T>(_ value: T) throws where T: Encodable, T: FixedWidthInteger, T: UnsignedInteger {
+    func encode<T>(_ value: T) throws where T: Encodable, T: FixedWidthInteger, T: UnsignedInteger {
         parent.register(unsignedStorage(value: value))
     }
     
-    mutating func encode<T>(_ value: T) throws where T : Encodable {
-        try value.encode(to: InternalEncoder(context: context, parent: parent))
+    func encode<T>(_ value: T) throws where T : Encodable {
+        try value.encode(to: InternalEncoder(parent: parent, context: context))
     }
 }

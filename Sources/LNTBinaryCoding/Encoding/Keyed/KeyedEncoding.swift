@@ -9,7 +9,7 @@ import Foundation
 import LNTSharedCoding
 
 struct KeyedBinaryEncodingContainer<Key>: KeyedEncodingContainerProtocol where Key: CodingKey {
-    let storage: KeyedTemporaryEncodingStorage, context: EncodingContext
+    private let storage: KeyedTemporaryEncodingStorage, context: EncodingContext
 
     var codingPath: [CodingKey] { context.codingPath }
 
@@ -18,38 +18,28 @@ struct KeyedBinaryEncodingContainer<Key>: KeyedEncodingContainerProtocol where K
         self.context = context
     }
 
-    private func writer(key: CodingKey) -> TemporaryEncodingStorageWriter {
-        let key = key.stringValue
-        context.register(string: key)
-        return storage.temporaryWriter(for: key)
+    private func encoder(for key: CodingKey) -> InternalEncoder {
+        let keyString = key.stringValue
+        context.register(string: keyString)
+        return .init(parent: storage.temporaryWriter(for: keyString), context: context.appending(key))
     }
 
-    mutating func encodeNil(forKey key: Key) throws {
-        writer(key: key).register(NilStorage())
+    func encodeNil(forKey key: Key) throws {
+        var container = encoder(for: key).singleValueContainer()
+        try container.encodeNil()
     }
 
-    mutating func encode<T>(_ value: T, forKey key: Key) throws where T : Encodable {
-        try value.encode(to: InternalEncoder(context: context.appending(key), parent: writer(key: key)))
-    }
+    func encode<T>(_ value: T, forKey key: Key) throws where T : Encodable { try value.encode(to: encoder(for: key)) }
+    func superEncoder() -> Encoder { encoder(for: SuperCodingKey()) }
+    func superEncoder(forKey key: Key) -> Encoder { encoder(for: key) }
+    func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer { encoder(for: key).unkeyedContainer() }
 
-    mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> where NestedKey : CodingKey {
-        .init(KeyedBinaryEncodingContainer<NestedKey>(parent: writer(key: key), context: context.appending(key)))
-    }
-
-    mutating func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer {
-        UnkeyedBinaryEncodingContainer(parent: writer(key: key), context: context.appending(key))
-    }
-
-    mutating func superEncoder() -> Encoder {
-        InternalEncoder(context: context.appending(SuperCodingKey()), parent: writer(key: SuperCodingKey()))
-    }
-
-    mutating func superEncoder(forKey key: Key) -> Encoder {
-        InternalEncoder(context: context.appending(key), parent: writer(key: key))
+    func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> where NestedKey : CodingKey {
+        encoder(for: key).container(keyedBy: NestedKey.self)
     }
 }
 
-class KeyedTemporaryEncodingStorage {
+private class KeyedTemporaryEncodingStorage {
     let parent: TemporaryEncodingStorageWriter
     private var values: [String: EncodingStorage] = [:]
 

@@ -8,7 +8,7 @@
 import Foundation
 
 struct InternalEncoder: Encoder {
-    let context: EncodingContext, parent: TemporaryEncodingStorageWriter
+    let parent: TemporaryEncodingStorageWriter, context: EncodingContext
 
     var userInfo: [CodingUserInfoKey : Any] { context.userInfo }
     var codingPath: [CodingKey] { context.codingPath }

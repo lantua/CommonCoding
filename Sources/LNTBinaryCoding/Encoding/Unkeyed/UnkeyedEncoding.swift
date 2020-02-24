@@ -9,7 +9,7 @@ import Foundation
 import LNTSharedCoding
 
 struct UnkeyedBinaryEncodingContainer: UnkeyedEncodingContainer {
-    let storage: UnkeyedTemporaryEncodingStorage, context: EncodingContext
+    private let storage: UnkeyedTemporaryEncodingStorage, context: EncodingContext
 
     var codingPath: [CodingKey] { context.codingPath }
     var count: Int { storage.count }
@@ -19,31 +19,26 @@ struct UnkeyedBinaryEncodingContainer: UnkeyedEncodingContainer {
         self.context = context
     }
 
-    private func writer() -> TemporaryEncodingStorageWriter {
-        storage.temporaryWriter()
+    private func encoder() -> InternalEncoder {
+        let encoderContext = context.appending(UnkeyedCodingKey(intValue: count))
+        return .init(parent: storage.temporaryWriter(), context: encoderContext)
     }
 
-    mutating func encodeNil() throws { writer().register(NilStorage()) }
-
-    mutating func encode<T>(_ value: T) throws where T: Encodable {
-        try value.encode(to: InternalEncoder(context: context.appending(UnkeyedCodingKey(intValue: count)), parent: writer()))
+    func encodeNil() throws {
+        var container = encoder().singleValueContainer()
+        try container.encodeNil()
     }
 
-    mutating func nestedContainer<NestedKey>(keyedBy _: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> where NestedKey : CodingKey {
-        .init(KeyedBinaryEncodingContainer<NestedKey>(parent: writer(), context: context.appending(UnkeyedCodingKey(intValue: count))))
-    }
-
-    mutating func nestedUnkeyedContainer() -> UnkeyedEncodingContainer {
-        UnkeyedBinaryEncodingContainer(parent: writer(), context: context.appending(UnkeyedCodingKey(intValue: count)))
-    }
-
-    mutating func superEncoder() -> Encoder {
-        InternalEncoder(context: context.appending(UnkeyedCodingKey(intValue: count)), parent: writer())
+    func encode<T>(_ value: T) throws where T: Encodable { try value.encode(to: encoder()) }
+    func superEncoder() -> Encoder { encoder() }
+    func nestedUnkeyedContainer() -> UnkeyedEncodingContainer { encoder().unkeyedContainer() }
+    func nestedContainer<NestedKey>(keyedBy _: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> where NestedKey : CodingKey {
+        encoder().container(keyedBy: NestedKey.self)
     }
 }
 
-class UnkeyedTemporaryEncodingStorage {
-    let parent: TemporaryEncodingStorageWriter
+private class UnkeyedTemporaryEncodingStorage {
+    private let parent: TemporaryEncodingStorageWriter
     private var values: [EncodingStorage] = []
 
     var count: Int { values.count }
@@ -53,8 +48,8 @@ class UnkeyedTemporaryEncodingStorage {
     }
 
     func temporaryWriter() -> UnkeyedTemporaryEncodingStorageWriter {
-        values.append(NilStorage())
-        return .init(parent: self, index: values.count - 1)
+        defer { values.append(NilStorage()) }
+        return .init(parent: self, index: values.count)
     }
 
     struct UnkeyedTemporaryEncodingStorageWriter: TemporaryEncodingStorageWriter {

@@ -8,14 +8,22 @@
 import Foundation
 
 /// Temporary Storage. Use while in the process of encoding data.
-protocol TemporaryEncodingStorage {
-    func finalize() -> EncodingStorage
+protocol TemporaryEncodingStorageWriter {
+    func register(_: EncodingStorage)
+}
+
+class TopLevelTemporaryEncodingStorage: TemporaryEncodingStorageWriter {
+    var value: EncodingStorage = NilStorage()
+
+    func register(_ newValue: EncodingStorage) {
+        value = newValue
+    }
 }
 
 /// Compiled Storage.
 /// Created after the encoding process but before the writing process.
 /// Can be optimized to different context.
-protocol EncodingStorage: TemporaryEncodingStorage {
+protocol EncodingStorage {
     var header: Header { get }
     var payloadSize: Int { get }
     func writePayload(to data: Slice<UnsafeMutableRawBufferPointer>)
@@ -32,6 +40,4 @@ extension EncodingStorage {
         header.write(to: &data)
         writePayload(to: data)
     }
-
-    func finalize() -> EncodingStorage { self }
 }

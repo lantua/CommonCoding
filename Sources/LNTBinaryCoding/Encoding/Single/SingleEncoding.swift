@@ -7,26 +7,16 @@
 
 import Foundation
 
-class TempSingleValueStorage: TemporaryEncodingStorage {
-    var value: TemporaryEncodingStorage = NilStorage()
-
-    func finalize() -> EncodingStorage {
-        value.finalize()
-    }
-}
-
 struct SingleValueBinaryEncodingContainer: SingleValueEncodingContainer {
-    let storage: TempSingleValueStorage, context: EncodingContext
+    let parent: TemporaryEncodingStorageWriter, context: EncodingContext
 
     var codingPath: [CodingKey] { context.codingPath }
 
-    mutating func encodeNil() throws {
-        storage.value = NilStorage()
-    }
+    mutating func encodeNil() throws { parent.register(NilStorage()) }
 
     mutating func encode(_ value: String) throws {
         context.register(string: value)
-        storage.value = StringStorage(string: value)
+        parent.register(StringStorage(string: value))
     }
 
     mutating func encode(_ value: Bool) throws { try encode(value ? 1 : 0 as UInt8) }
@@ -34,13 +24,13 @@ struct SingleValueBinaryEncodingContainer: SingleValueEncodingContainer {
     mutating func encode(_ value: Float) throws { try encode(value.bitPattern) }
 
     mutating func encode<T>(_ value: T) throws where T: Encodable, T: FixedWidthInteger, T: SignedInteger {
-        storage.value = signedStorage(value: value)
+        parent.register(signedStorage(value: value))
     }
     mutating func encode<T>(_ value: T) throws where T: Encodable, T: FixedWidthInteger, T: UnsignedInteger {
-        storage.value = unsignedStorage(value: value)
+        parent.register(unsignedStorage(value: value))
     }
     
     mutating func encode<T>(_ value: T) throws where T : Encodable {
-        try value.encode(to: InternalEncoder(context: context, storage: storage))
+        try value.encode(to: InternalEncoder(context: context, parent: parent))
     }
 }

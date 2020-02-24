@@ -7,35 +7,21 @@
 
 import Foundation
 
-class InternalEncoder: Encoder {
-    let storage: TempSingleValueStorage, context: EncodingContext
+struct InternalEncoder: Encoder {
+    let context: EncodingContext, parent: TemporaryEncodingStorageWriter
 
     var userInfo: [CodingUserInfoKey : Any] { context.userInfo }
     var codingPath: [CodingKey] { context.codingPath }
 
-    init(context: EncodingContext, storage: TempSingleValueStorage) {
-        self.storage = storage
-        self.context = context
-    }
-
-    private func register<T>(_ value: T) -> T where T: TemporaryEncodingStorage {
-        storage.value = value
-        return value
-    }
-
     func container<Key>(keyedBy type: Key.Type) -> KeyedEncodingContainer<Key> where Key : CodingKey {
-        .init(KeyedBinaryEncodingContainer(storage: register(.init()), context: context))
+        .init(KeyedBinaryEncodingContainer(parent: parent, context: context))
     }
 
     func unkeyedContainer() -> UnkeyedEncodingContainer {
-        UnkeyedBinaryEncodingContainer(storage: register(.init()), context: context)
+        UnkeyedBinaryEncodingContainer(parent: parent, context: context)
     }
 
     func singleValueContainer() -> SingleValueEncodingContainer {
-        SingleValueBinaryEncodingContainer(storage: storage, context: context)
-    }
-
-    deinit {
-        storage.value = storage.finalize()
+        SingleValueBinaryEncodingContainer(parent: parent, context: context)
     }
 }

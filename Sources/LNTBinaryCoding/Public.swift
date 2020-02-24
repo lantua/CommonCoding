@@ -27,16 +27,16 @@ public struct BinaryEncoder {
     public var userInfo: [CodingUserInfoKey: Any] = [:]
 
     public func encode<S>(_ value: S) throws -> Data where S: Encodable {
-        let temp = TempSingleValueStorage()
+        let temp = TopLevelTemporaryEncodingStorage()
         
         let encodingContext = EncodingContext(userInfo: userInfo)
-        let encoder = InternalEncoder(context: encodingContext, storage: temp)
+        let encoder = InternalEncoder(context: encodingContext, parent: temp)
         try value.encode(to: encoder)
 
         let strings = encodingContext.optimize()
         let context = OptimizationContext(strings: strings)
 
-        var storage = temp.finalize()
+        var storage = temp.value
         storage.optimize(for: context)
 
         let stringMapSize = strings.count.vsuiSize + strings.lazy.map { $0.utf8.count }.reduce(0, +) + strings.count

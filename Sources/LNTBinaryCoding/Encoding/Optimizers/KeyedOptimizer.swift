@@ -1,5 +1,5 @@
 //
-//  KeyedStorage.swift
+//  KeyedOptimizer.swift
 //  
 //
 //  Created by Natchanon Luangsomboon on 20/2/2563 BE.
@@ -7,13 +7,13 @@
 
 import Foundation
 
-struct KeyedStorage: EncodingStorage {
-    private var values: [String: EncodingStorage]
+struct KeyedOptimizer: EncodingOptimizer {
+    private var values: [String: EncodingOptimizer]
 
     var header = Header.nil
     private(set) var payloadSize = 0
 
-    init(values: [String: EncodingStorage]) {
+    init(values: [String: EncodingOptimizer]) {
         self.values = values
     }
 
@@ -76,7 +76,7 @@ struct KeyedStorage: EncodingStorage {
     }
 }
 
-private extension KeyedStorage {
+private extension KeyedOptimizer {
     func regularSize(keys: [Int]) -> (header: Header, payload: Int) {
         let header = Header.regularKeyed(.init(mapping: .init(zip(keys, values.values.lazy.map { $0.size }))))
         return (header, values.values.lazy.map { $0.size }.reduce(0, +))

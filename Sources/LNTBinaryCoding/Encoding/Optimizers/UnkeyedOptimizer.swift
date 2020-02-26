@@ -1,5 +1,5 @@
 //
-//  UnkeyedStorage.swift
+//  UnkeyedOptimizer.swift
 //  
 //
 //  Created by Natchanon Luangsomboon on 20/2/2563 BE.
@@ -7,12 +7,12 @@
 
 import Foundation
 
-struct UnkeyedStorage: EncodingStorage {
+struct UnkeyedOptimizer: EncodingOptimizer {
     var header = Header.nil
-    private var values: [EncodingStorage]
+    private var values: [EncodingOptimizer]
     private(set) var payloadSize = 0
 
-    init(values: [EncodingStorage]) {
+    init(values: [EncodingOptimizer]) {
         self.values = values
     }
 
@@ -73,7 +73,7 @@ struct UnkeyedStorage: EncodingStorage {
     }
 }
 
-private extension UnkeyedStorage {
+private extension UnkeyedOptimizer {
     func regularSize() -> (header: Header, payload: Int) {
         let sizes = values.lazy.map { $0.size }
         let header = Header.regularUnkeyed(.init(sizes: Array(sizes)))

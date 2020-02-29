@@ -10,12 +10,12 @@ import Foundation
 extension RegularKeyedHeader {
     init(data: inout Data) throws {
         var mapping: [(key: Int, size: Int)] = []
-        var size = try data.readInteger()
+        var size = try data.extractVSUI()
         while size != 1 {
-            let key = try data.readInteger()
+            let key = try data.extractVSUI()
             mapping.append((key, size))
 
-            size = try data.readInteger()
+            size = try data.extractVSUI()
         }
 
         self.mapping = mapping
@@ -26,11 +26,11 @@ extension EquisizeKeyedHeader {
     init(data: inout Data) throws {
         var keys: [Int] = []
 
-        let size = try data.readInteger()
-        var keyIndex = try data.readInteger()
+        let size = try data.extractVSUI()
+        var keyIndex = try data.extractVSUI()
         while keyIndex != 0 {
             keys.append(keyIndex)
-            keyIndex = try data.readInteger()
+            keyIndex = try data.extractVSUI()
         }
 
         self.size = size
@@ -40,13 +40,13 @@ extension EquisizeKeyedHeader {
 
 extension UniformKeyedHeader {
     init(data: inout Data) throws {
-        let itemSize = try data.readInteger()
+        let itemSize = try data.extractVSUI()
 
         var keys: [Int] = []
-        var keyIndex = try data.readInteger()
+        var keyIndex = try data.extractVSUI()
         while keyIndex != 0 {
             keys.append(keyIndex)
-            keyIndex = try data.readInteger()
+            keyIndex = try data.extractVSUI()
         }
 
         let header = try Header(data: &data)
@@ -60,10 +60,10 @@ extension UniformKeyedHeader {
 extension RegularUnkeyedHeader {
     init(data: inout Data) throws {
         var sizes: [Int] = []
-        var size = try data.readInteger()
+        var size = try data.extractVSUI()
         while size != 1 {
             sizes.append(size)
-            size = try data.readInteger()
+            size = try data.extractVSUI()
         }
 
         self.sizes = sizes
@@ -72,15 +72,15 @@ extension RegularUnkeyedHeader {
 
 extension EquisizedUnkeyedHeader {
     init(data: inout Data) throws {
-        size = try data.readInteger()
-        count = try data.readInteger()
+        size = try data.extractVSUI()
+        count = try data.extractVSUI()
     }
 }
 
 extension UniformUnkeyedHeader {
     init(data: inout Data) throws {
-        itemSize = try data.readInteger()
-        count  = try data.readInteger()
+        itemSize = try data.extractVSUI()
+        count  = try data.extractVSUI()
         subheader = try Header(data: &data)
     }
 }

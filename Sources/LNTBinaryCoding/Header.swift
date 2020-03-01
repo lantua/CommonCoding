@@ -15,6 +15,15 @@ enum Header {
     indirect case uniformKeyed(UniformKeyedHeader), uniformUnkeyed(UniformUnkeyedHeader)
 }
 
+extension Header {
+    var isNil: Bool {
+        guard case .nil = self else {
+            return false
+        }
+        return true
+    }
+}
+
 struct RegularKeyedHeader {
     var mapping: [(key: Int, size: Int)]
 

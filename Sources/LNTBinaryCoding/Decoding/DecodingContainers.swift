@@ -8,6 +8,8 @@
 import Foundation
 import LNTSharedCoding
 
+typealias HeaderData = (header: Header, data: Data)
+
 // MARK: Context
 
 struct DecodingContext {
@@ -56,11 +58,11 @@ extension DecodingContext {
 // MARK: Encoder
 
 struct InternalDecoder: Decoder {
-    private let storage: Storage, context: DecodingContext
+    let storage: PartiallyParsedStorage, context: DecodingContext
 
-    init(storage: Storage, context: DecodingContext) throws {
+    init(_ arg: HeaderData, context: DecodingContext) throws {
         do {
-            self.storage = try storage.parse(context: context)
+            self.storage = try .init(arg, context: context)
         } catch {
             throw DecodingError.dataCorrupted(context.error(error: error))
         }
@@ -92,7 +94,7 @@ struct InternalDecoder: Decoder {
 // MARK: Keyed Container
 
 struct KeyedBinaryDecodingContainer<Key>: KeyedDecodingContainerProtocol where Key: CodingKey {
-    let values: [String: Storage], context: DecodingContext
+    let values: [String: HeaderData], context: DecodingContext
 
     var codingPath: [CodingKey] { context.codingPath }
     var allKeys: [Key] { values.keys.compactMap(Key.init(stringValue:)) }
@@ -103,10 +105,10 @@ struct KeyedBinaryDecodingContainer<Key>: KeyedDecodingContainerProtocol where K
             throw DecodingError.keyNotFound(key, context.error())
         }
 
-        return try .init(storage: value, context: context.appending(key))
+        return try .init(value, context: context.appending(key))
     }
 
-    func decodeNil(forKey key: Key) throws -> Bool { values[key.stringValue]?.isNil ?? true }
+    func decodeNil(forKey key: Key) throws -> Bool { values[key.stringValue]?.header.isNil ?? true }
 
     func decode<T>(_ type: T.Type, forKey key: Key) throws -> T where T : Decodable {
         try T(from: decoder(for: key))
@@ -123,13 +125,13 @@ struct KeyedBinaryDecodingContainer<Key>: KeyedDecodingContainerProtocol where K
 // MARK: Unkeyed Container
 
 struct UnkeyedBinaryDecodingContainer: UnkeyedDecodingContainer {
-    private var values: ArraySlice<Storage>
+    private var values: ArraySlice<HeaderData>
     let context: DecodingContext
 
     let count: Int?
     var currentIndex = 0
 
-    init(values: [Storage], context: DecodingContext) {
+    init(values: [HeaderData], context: DecodingContext) {
         self.values = values[...]
         self.context = context
         self.count = values.count
@@ -144,10 +146,10 @@ struct UnkeyedBinaryDecodingContainer: UnkeyedDecodingContainer {
         }
 
         defer { currentIndex += 1 }
-        return try .init(storage: values.removeFirst(), context: context.appending(UnkeyedCodingKey(intValue: currentIndex)))
+        return try .init(values.removeFirst(), context: context.appending(UnkeyedCodingKey(intValue: currentIndex)))
     }
 
-    mutating func decodeNil() throws -> Bool { isAtEnd || values.first!.isNil }
+    mutating func decodeNil() throws -> Bool { values.first?.header.isNil ?? true }
 
     mutating func decode<T>(_ type: T.Type) throws -> T where T : Decodable {
         return try T(from: consumeDecoder())

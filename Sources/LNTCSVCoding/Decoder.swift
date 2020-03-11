@@ -7,6 +7,8 @@
 
 import LNTSharedCoding
 
+// MARK: Context
+
 /// Decoding context, shared between all internal decoders, containers, etc. during single-element decoding process.
 struct DecodingContext {
     private let decoder: CSVDecoder
@@ -40,6 +42,8 @@ struct DecodingContext {
     }
 }
 
+// MARK: Decoder
+
 /// Internal decoder. This is what the `Decodable` uses when decoding
 struct CSVInternalDecoder: Decoder {
     let context: DecodingContext, schema: Schema, codingPath: [CodingKey]
@@ -63,6 +67,8 @@ struct CSVInternalDecoder: Decoder {
     func singleValueContainer() throws -> SingleValueDecodingContainer { self }
 }
 
+// MARK: Keyed Container
+
 private struct CSVKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainerProtocol {
     let decoder: CSVInternalDecoder, schemas: [String: Schema]
 
@@ -75,11 +81,11 @@ private struct CSVKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainer
         // Decodables that uses this is usually dynamic, so `nil` fields would be used
         // to mark the absence of key. If the key definitely must be present, it's usually
         // hard-coded in the generated/user-defined `init(from:)` and bypass this value anyway.
-        schemas.filter { context.hasValue(at: $0.value) }.map { Key(stringValue: $0.key)! }
+        schemas.filter { context.hasValue(at: $0.value) }.compactMap { Key(stringValue: $0.key) }
     }
 
     init(decoder: CSVInternalDecoder) throws {
-        guard let schemas = decoder.schema.getContainer(keyedBy: Key.self) else {
+        guard let schemas = decoder.schema.getKeyedContainer() else {
             throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "Expecting multi-field object"))
         }
         self.decoder = decoder
@@ -119,6 +125,8 @@ private struct CSVKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainer
         try decoder(forKey: key).container(keyedBy: NestedKey.self)
     }
 }
+
+// MARK: Unkeyed Container
 
 private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     let decoder: CSVInternalDecoder
@@ -171,6 +179,8 @@ private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
         try .init(CSVKeyedDecodingContainer(decoder: consumeDecoder()))
     }
 }
+
+// MARK: Single Value Container
 
 extension CSVInternalDecoder: SingleValueDecodingContainer {
     func decodeNil() -> Bool { !context.hasValue(at: schema) }

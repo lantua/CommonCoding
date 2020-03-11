@@ -7,6 +7,8 @@
 
 import LNTSharedCoding
 
+// MARK: Context
+
 /// Encoding context, shared between all internal encoders, containers, etc. during single-element encoding process.
 class EncodingContext {
     private let encoder: CSVEncoder, isFixed: Bool
@@ -59,6 +61,8 @@ class EncodingContext {
     }
 }
 
+// MARK: Encoder
+
 /// Internal decoder. This is what the `Decodable` uses when decoding
 struct CSVInternalEncoder: Encoder {
     let context: EncodingContext, codingPath: [CodingKey]
@@ -75,6 +79,8 @@ struct CSVInternalEncoder: Encoder {
     
     func singleValueContainer() -> SingleValueEncodingContainer { self }
 }
+
+// MARK: Keyed Container
 
 private struct CSVKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingContainerProtocol {
     let encoder: CSVInternalEncoder
@@ -121,6 +127,8 @@ private struct CSVKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingContainer
     }
 }
 
+// MARK: Unkeyed Container
+
 private struct CSVUnkeyedEncodingContainer: UnkeyedEncodingContainer {
     let encoder: CSVInternalEncoder
 
@@ -151,6 +159,8 @@ private struct CSVUnkeyedEncodingContainer: UnkeyedEncodingContainer {
         .init(CSVKeyedEncodingContainer(encoder: consumeEncoder()))
     }
 }
+
+// MARK: Single Value Container
 
 extension CSVInternalEncoder: SingleValueEncodingContainer {
     mutating func encodeNil() throws { try context.add(unescaped: nil, to: codingPath) }

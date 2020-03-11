@@ -6,13 +6,8 @@
 //
 
 /// Schema of the current object. Contains a single index (for simple types), or key-schema dictionary (for complex types).
-final class Schema {
-    enum Raw {
-        case value(Int), nested([String: Schema])
-    }
-    let raw: Raw
-
-    var keyedCache: [ObjectIdentifier: [String: Schema]] = [:], unkeyedCache: [Schema]?
+enum Schema {
+    case value(Int), nested([String: Schema])
 
     init(data: [(offset: Int, element: Array<Substring>.SubSequence)]) throws {
         // By constrution, `data` can not be empty at non-top level.
@@ -21,64 +16,53 @@ final class Schema {
         assert(!data.isEmpty)
 
         guard data.allSatisfy({ !$0.element.isEmpty }) else {
-            if data.contains(where: { !$0.element.isEmpty }) {
+            guard data.allSatisfy({ $0.element.isEmpty }) else {
                 throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Mixed multi/single-field entry found"))
             }
-            if data.count > 1 {
+            guard data.count == 1 else {
                 throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Duplicated fields"))
             }
-            raw = .value(data.first!.offset)
+            self = .value(data.first!.offset)
             return
         }
-        let groupped: [String: Schema] = try Dictionary(grouping: data) { String($0.element.first!) }.mapValues {
+        let groupped = try Dictionary(grouping: data) { String($0.element.first!) }.mapValues {
             try Schema(data: $0.map { ($0.offset, $0.element.dropFirst()) })
         }
-        raw = .nested(groupped)
+        self = .nested(groupped)
     }
 
     /// Returns `true` if any index in the schema matches `predicate`.
     func contains(where predicate: (Int) throws -> Bool) rethrows -> Bool {
-        switch raw {
+        switch self {
         case let .value(data): return try predicate(data)
         case let .nested(data): return try data.values.contains { try $0.contains(where: predicate) }
         }
     }
 
-    func getContainer<Key: CodingKey>(keyedBy keys: Key.Type) -> [String: Schema]? {
-        let identifier = ObjectIdentifier(keys.self)
-        guard let cache = keyedCache[identifier] else {
-            guard case let .nested(data) = raw else {
-                return nil
-            }
-            // "super" key is a special key for superEncoder/Decoder functions
-            let result = data.filter { Key(stringValue: $0.key) != nil || $0.key == "super" }
-            keyedCache[identifier] = result
-            return result
+    func getKeyedContainer() -> [String: Schema]? {
+        guard case let .nested(data) = self else {
+            return nil
         }
-        return cache
+
+        return data
     }
 
     func getUnkeyedContainer() -> [Schema]? {
-        guard let cache = unkeyedCache else {
-            guard case let .nested(data) = raw else {
-                return nil
-            }
-            var result: [Schema] = []
-            for i in 0..<data.count {
-                guard let schema = data[String(i)] else {
-                    break
-                }
-                result.append(schema)
-            }
-
-            unkeyedCache = result
-            return result
+        guard case let .nested(data) = self else {
+            return nil
         }
-        return cache
+        var result: [Schema] = []
+        for i in 0..<data.count {
+            guard let schema = data[String(i)] else {
+                break
+            }
+            result.append(schema)
+        }
+        return result
     }
 
     func getValue() -> Int? {
-        guard case let .value(value) = raw else {
+        guard case let .value(value) = self else {
             return nil
         }
         return value

@@ -24,7 +24,7 @@ final class CSVCodingTests: XCTestCase {
             "llk""d",jjkk
             ,
             """
-            let tokens = UnescapedCSVTokens(base: value, separator: ",")
+            let tokens = UnescapedCSVTokens(base: value)
             var iterator = tokens.makeIterator()
             XCTAssertEqual(iterator.next(), .unescaped("a"))
             XCTAssertEqual(iterator.next(), .escaped("l"))
@@ -48,7 +48,7 @@ final class CSVCodingTests: XCTestCase {
         }
         do {
             let value = "\"ghghg\""
-            let tokens = UnescapedCSVTokens(base: value, separator: ",")
+            let tokens = UnescapedCSVTokens(base: value)
             var iterator = tokens.makeIterator()
 
             XCTAssertEqual(iterator.next(), .escaped("ghghg"))
@@ -59,7 +59,7 @@ final class CSVCodingTests: XCTestCase {
         }
         do {
             let value = "ghghg"
-            let tokens = UnescapedCSVTokens(base: value, separator: ",")
+            let tokens = UnescapedCSVTokens(base: value)
             var iterator = tokens.makeIterator()
 
             XCTAssertEqual(iterator.next(), .unescaped("ghghg"))
@@ -72,7 +72,7 @@ final class CSVCodingTests: XCTestCase {
             let value = """
             a,l,alskl",asd\n
             """
-            let tokens = UnescapedCSVTokens(base: value, separator: ",")
+            let tokens = UnescapedCSVTokens(base: value)
             var iterator = tokens.makeIterator()
 
             XCTAssertEqual(iterator.next(), .unescaped("a"))
@@ -86,7 +86,7 @@ final class CSVCodingTests: XCTestCase {
             let value = """
             "a\"k\n
             """
-            let tokens = UnescapedCSVTokens(base: value, separator: ",")
+            let tokens = UnescapedCSVTokens(base: value)
             var iterator = tokens.makeIterator()
 
             XCTAssertEqual(iterator.next(), .invalid(.invalidEscaping("k")))
@@ -98,7 +98,7 @@ final class CSVCodingTests: XCTestCase {
             let value = """
             "a\""hjhu\n
             """
-            let tokens = UnescapedCSVTokens(base: value, separator: ",")
+            let tokens = UnescapedCSVTokens(base: value)
             var iterator = tokens.makeIterator()
 
             XCTAssertEqual(iterator.next(), .invalid(.unclosedQoute))

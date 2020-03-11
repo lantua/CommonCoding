@@ -5,6 +5,8 @@
 //  Created by Natchanon Luangsomboon on 1/8/2562 BE.
 //
 
+let separator: Character = ","
+
 public struct CSVEncodingOptions: OptionSet {
     public let rawValue: Int
     public init(rawValue: Int) {
@@ -95,18 +97,17 @@ public struct CSVDecoder {
     public var options: CSVDecodingOptions
     public var userInfo: [CodingUserInfoKey: Any]
 
-    private let separator, subheaderSeparator: Character
+    private let subheaderSeparator: Character
     
-    public init(separator: Character = ",", subheaderSeparator: Character = ".", options: CSVDecodingOptions = [], userInfo: [CodingUserInfoKey: Any] = [:]) {
-        self.separator = separator
+    public init(subheaderSeparator: Character = ".", options: CSVDecodingOptions = [], userInfo: [CodingUserInfoKey: Any] = [:]) {
         self.subheaderSeparator = subheaderSeparator
         self.options = options
         self.userInfo = userInfo
     }
     
-    public func decode<S, T>(_ type: T.Type, from string: S) throws -> [T] where S: Sequence, S.Element == Character, T: Decodable {
+    public func decode<S, T>(_ type: T.Type, from string: S) throws -> [T] where S: StringProtocol, T: Decodable {
         var buffer: [String?] = [], schema: Schema!, fieldCount: Int?, results: [T] = []
-        for token in UnescapedCSVTokens(base: string, separator: separator) {
+        for token in UnescapedCSVTokens(base: string) {
             switch token {
             case let .escaped(string): buffer.append(string)
             case let .unescaped(string):

@@ -92,7 +92,5 @@ struct UnescapedCSVTokens<S: StringProtocol>: Sequence {
         }
     }
 
-    func makeIterator() -> Iterator {
-        return Iterator(remaining: base[...])
-    }
+    func makeIterator() -> Iterator { Iterator(remaining: base[...]) }
 }

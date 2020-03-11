@@ -110,10 +110,7 @@ struct KeyedBinaryDecodingContainer<Key>: KeyedDecodingContainerProtocol where K
 
     func decodeNil(forKey key: Key) throws -> Bool { values[key.stringValue]?.header.isNil ?? true }
 
-    func decode<T>(_ type: T.Type, forKey key: Key) throws -> T where T : Decodable {
-        try T(from: decoder(for: key))
-    }
-
+    func decode<T>(_ type: T.Type, forKey key: Key) throws -> T where T : Decodable { try T(from: decoder(for: key)) }
     func superDecoder() throws -> Decoder { try decoder(for: SuperCodingKey()) }
     func superDecoder(forKey key: Key) throws -> Decoder { try decoder(for: key) }
     func nestedUnkeyedContainer(forKey key: Key) throws -> UnkeyedDecodingContainer { try decoder(for: key).unkeyedContainer() }
@@ -151,10 +148,7 @@ struct UnkeyedBinaryDecodingContainer: UnkeyedDecodingContainer {
 
     mutating func decodeNil() throws -> Bool { values.first?.header.isNil ?? true }
 
-    mutating func decode<T>(_ type: T.Type) throws -> T where T : Decodable {
-        return try T(from: consumeDecoder())
-    }
-
+    mutating func decode<T>(_ type: T.Type) throws -> T where T : Decodable { try T(from: consumeDecoder()) }
     mutating func superDecoder() throws -> Decoder { try consumeDecoder() }
     mutating func nestedUnkeyedContainer() throws -> UnkeyedDecodingContainer { try consumeDecoder().unkeyedContainer() }
     mutating func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type) throws -> KeyedDecodingContainer<NestedKey> where NestedKey : CodingKey {

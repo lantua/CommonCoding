@@ -25,10 +25,9 @@ public struct CSVEncoder {
     public var options: CSVEncodingOptions
     public var userInfo: [CodingUserInfoKey: Any]
     
-    private let separator: Character, subheaderSeparator: String
+    private let subheaderSeparator: String
     
-    public init(separator: Character = ",", subheaderSeparator: Character = ".", options: CSVEncodingOptions = [], userInfo: [CodingUserInfoKey: Any] = [:]) {
-        self.separator = separator
+    public init(subheaderSeparator: Character = ".", options: CSVEncodingOptions = [], userInfo: [CodingUserInfoKey: Any] = [:]) {
         self.subheaderSeparator = String(subheaderSeparator)
         self.options = options
         self.userInfo = userInfo
@@ -55,7 +54,6 @@ public struct CSVEncoder {
     }
     
     public func encode<S, Output>(_ values: S, into output: inout Output) throws where S: Sequence, S.Element: Encodable, Output: TextOutputStream {
-        let separator = String(self.separator)
         var fieldIndices: [String: Int]?
         
         for value in values {
@@ -71,12 +69,12 @@ public struct CSVEncoder {
                 fieldIndices = currentFieldIndices
                 if !options.contains(.omitHeader) {
                     let header = currentFieldIndices.sorted { $0.value < $1.value }.map { $0.key }
-                    print(header.joined(separator: separator), to: &output)
+                    print(header.joined(separator: String(separator)), to: &output)
                 }
             }
             assert(currentFieldIndices.allSatisfy { fieldIndices![$0.key] == $0.value })
 
-            print(entry.map(escape).joined(separator: separator), to: &output)
+            print(entry.map(escape).joined(separator: String(separator)), to: &output)
         }
     }
 }
@@ -97,8 +95,8 @@ public struct CSVDecoder {
     public var options: CSVDecodingOptions
     public var userInfo: [CodingUserInfoKey: Any]
 
-    private let subheaderSeparator: Character
-    
+    public var subheaderSeparator: Character
+
     public init(subheaderSeparator: Character = ".", options: CSVDecodingOptions = [], userInfo: [CodingUserInfoKey: Any] = [:]) {
         self.subheaderSeparator = subheaderSeparator
         self.options = options

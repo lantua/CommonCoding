@@ -31,10 +31,9 @@ a,b,c,super.a,super.b,super.c
 ## CSVEncoder Functions
 
 ```
-public init(separator: Character = ",", subheaderSeparator: Character = ".", options: CSVEncodingOptions = [], userInfo: [CodingUserInfoKey: Any] = [:])
+public init(subheaderSeparator: Character = ".", options: CSVEncodingOptions = [], userInfo: [CodingUserInfoKey: Any] = [:])
 ```
 
-* `separator`: Separator used to break eack column. Also applies to header.
 * `subheaderSeparator`: Separator used to separate each subheader if there are nested containers.
 * `options`: 
   * `omitHeader`: Don't print header line.
@@ -73,10 +72,9 @@ public func encode<S, Output>(_ values: S, into output: inout Output) throws whe
 ## CSVDecoder Functions
 
 ```
-public init(separator: Character = ",", subheaderSeparator: Character = ".", options: CSVDecodingOptions = [], userInfo: [CodingUserInfoKey: Any] = [:])
+public init(subheaderSeparator: Character = ".", options: CSVDecodingOptions = [], userInfo: [CodingUserInfoKey: Any] = [:])
 ```
 
-* `separator`: Separator used to break eack column. Also applies to header.
 * `subheaderSeparator`: Separator used to separate each subheader if there are nested containers.
 * `options`: 
   * `treatEmptyStringAsValue`: treats unescaped empty string as empty string (default is to treat it as `nil`).

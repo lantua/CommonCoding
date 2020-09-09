@@ -9,6 +9,7 @@ final class CSVCodingTests: XCTestCase {
         XCTAssertEqual("aall".escaped(separator: ",", forced: false), "aall") // Non-escaping
 
         // Escaping
+        XCTAssertEqual("\"".escaped(separator: ",", forced: false), "\"\"\"\"")
         XCTAssertEqual("aa\"kj".escaped(separator: ",", forced: false), "\"aa\"\"kj\"") // Double quote
         XCTAssertEqual("aa\njj".escaped(separator: ",", forced: false), "\"aa\njj\"") // \n
         XCTAssertEqual("\u{11}".escaped(separator: ",", forced: false), "\"\u{11}\"") // Non-printable

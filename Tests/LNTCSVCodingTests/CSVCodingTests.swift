@@ -25,86 +25,53 @@ final class CSVCodingTests: XCTestCase {
             ,
             """
             let tokens = UnescapedCSVTokens(base: value)
-            var iterator = tokens.makeIterator()
-            XCTAssertEqual(iterator.next(), .unescaped("a"))
-            XCTAssertEqual(iterator.next(), .escaped("l"))
-            XCTAssertEqual(iterator.next(), .unescaped(""))
-            XCTAssertEqual(iterator.next(), .escaped(""))
-            XCTAssertEqual(iterator.next(), .rowBoundary)
-
-            XCTAssertEqual(iterator.next(), .unescaped(""))
-            XCTAssertEqual(iterator.next(), .rowBoundary)
-
-            XCTAssertEqual(iterator.next(), .escaped("llk\"d"))
-            XCTAssertEqual(iterator.next(), .unescaped("jjkk"))
-            XCTAssertEqual(iterator.next(), .rowBoundary)
-
-            XCTAssertEqual(iterator.next(), .unescaped(""))
-            XCTAssertEqual(iterator.next(), .unescaped(""))
-            XCTAssertEqual(iterator.next(), .rowBoundary)
-
-            XCTAssertNil(iterator.next())
-            XCTAssertNil(iterator.next())
+            XCTAssert(tokens.elementsEqual([
+                .unescaped("a"), .escaped("l"), .unescaped(""), .escaped(""), .rowBoundary,
+                .unescaped(""), .rowBoundary,
+                .escaped("llk\"d"), .unescaped("jjkk"), .rowBoundary,
+                .unescaped(""), .unescaped(""), .rowBoundary,
+            ]))
         }
         do {
             let value = "\"ghghg\""
             let tokens = UnescapedCSVTokens(base: value)
-            var iterator = tokens.makeIterator()
-
-            XCTAssertEqual(iterator.next(), .escaped("ghghg"))
-            XCTAssertEqual(iterator.next(), .rowBoundary)
-
-            XCTAssertNil(iterator.next())
-            XCTAssertNil(iterator.next())
+            XCTAssert(tokens.elementsEqual([
+                .escaped("ghghg"), .rowBoundary
+            ]))
         }
         do {
             let value = "ghghg"
             let tokens = UnescapedCSVTokens(base: value)
-            var iterator = tokens.makeIterator()
-
-            XCTAssertEqual(iterator.next(), .unescaped("ghghg"))
-            XCTAssertEqual(iterator.next(), .rowBoundary)
-
-            XCTAssertNil(iterator.next())
-            XCTAssertNil(iterator.next())
+            XCTAssert(tokens.elementsEqual([
+                .unescaped("ghghg"), .rowBoundary
+            ]))
         }
         do {
             let value = """
             a,l,alskl",asd\n
             """
             let tokens = UnescapedCSVTokens(base: value)
-            var iterator = tokens.makeIterator()
-
-            XCTAssertEqual(iterator.next(), .unescaped("a"))
-            XCTAssertEqual(iterator.next(), .unescaped("l"))
-            XCTAssertEqual(iterator.next(), .invalid(.unescapedQuote))
-
-            XCTAssertNil(iterator.next())
-            XCTAssertNil(iterator.next())
+            XCTAssert(tokens.elementsEqual([
+                .unescaped("a"), .unescaped("l"), .invalid(.unescapedQuote)
+            ]))
         }
         do {
             let value = """
             "a\"k\n
             """
             let tokens = UnescapedCSVTokens(base: value)
-            var iterator = tokens.makeIterator()
-
-            XCTAssertEqual(iterator.next(), .invalid(.invalidEscaping("k")))
-
-            XCTAssertNil(iterator.next())
-            XCTAssertNil(iterator.next())
+            XCTAssert(tokens.elementsEqual([
+                .invalid(.invalidEscaping("k"))
+            ]))
         }
         do {
             let value = """
             "a\""hjhu\n
             """
             let tokens = UnescapedCSVTokens(base: value)
-            var iterator = tokens.makeIterator()
-
-            XCTAssertEqual(iterator.next(), .invalid(.unclosedQoute))
-
-            XCTAssertNil(iterator.next())
-            XCTAssertNil(iterator.next())
+            XCTAssert(tokens.elementsEqual([
+                .invalid(.unclosedQoute)
+            ]))
         }
     }
 

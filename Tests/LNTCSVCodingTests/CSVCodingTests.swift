@@ -9,66 +9,53 @@ final class CSVCodingTests: XCTestCase {
         XCTAssertEqual("aall".escaped(separator: ",", forced: false), "aall") // Non-escaping
 
         // Escaping
-        XCTAssertEqual("\"".escaped(separator: ",", forced: false), "\"\"\"\"")
-        XCTAssertEqual("aa\"kj".escaped(separator: ",", forced: false), "\"aa\"\"kj\"") // Double quote
+        XCTAssertEqual("\"".escaped(separator: ",", forced: false), "\"\"\"\"") // Double quote
         XCTAssertEqual("aa\njj".escaped(separator: ",", forced: false), "\"aa\njj\"") // \n
-        XCTAssertEqual("\u{11}".escaped(separator: ",", forced: false), "\"\u{11}\"") // Non-printable
         XCTAssertEqual("🧐".escaped(separator: ",", forced: false), "\"🧐\"") // Non-ascii
-        XCTAssertEqual("asjk".escaped(separator: ",", forced: true), "\"asjk\"") // Forced
+        XCTAssertEqual("abc".escaped(separator: ",", forced: true), "\"abc\"") // Forced
     }
 
     func testTokenizer() {
         do {
             let value = """
-            a,"l",,""
+            a,"b",,""
 
-            "llk""d",jjkk
-            ,
+            "llk""d"
+            a
             """
             let tokens = UnescapedCSVTokens(base: value)
             XCTAssertEqual(Array(tokens), [
-                .unescaped("a"), .escaped("l"), .unescaped(""), .escaped(""), .rowBoundary,
+                .unescaped("a"), .escaped("b"), .unescaped(""), .escaped(""), .rowBoundary,
                 .unescaped(""), .rowBoundary,
-                .escaped("llk\"d"), .unescaped("jjkk"), .rowBoundary,
-                .unescaped(""), .unescaped(""), .rowBoundary,
+                .escaped("llk\"d"), .rowBoundary,
+                .unescaped("a"), .rowBoundary
             ])
         }
         do {
-            let value = "\"ghghg\""
+            let value = "\"test\""
             let tokens = UnescapedCSVTokens(base: value)
             XCTAssertEqual(Array(tokens), [
-                .escaped("ghghg"), .rowBoundary
-            ])
-        }
-        do {
-            let value = "ghghg"
-            let tokens = UnescapedCSVTokens(base: value)
-            XCTAssertEqual(Array(tokens), [
-                .unescaped("ghghg"), .rowBoundary
+                .escaped("test"), .rowBoundary
             ])
         }
         do {
             let value = """
-            a,l,alskl",asd\n
+            a,b,bad",
             """
             let tokens = UnescapedCSVTokens(base: value)
             XCTAssertEqual(Array(tokens), [
-                .unescaped("a"), .unescaped("l"), .invalid(.unescapedQuote)
+                .unescaped("a"), .unescaped("b"), .invalid(.unescapedQuote)
             ])
         }
         do {
-            let value = """
-            "a\"k\n
-            """
+            let value = #""a\"k""#
             let tokens = UnescapedCSVTokens(base: value)
             XCTAssertEqual(Array(tokens), [
                 .invalid(.invalidEscaping("k"))
             ])
         }
         do {
-            let value = """
-            "a\""hjhu\n
-            """
+            let value = #""un""closed"#
             let tokens = UnescapedCSVTokens(base: value)
             XCTAssertEqual(Array(tokens), [
                 .invalid(.unclosedQoute)
@@ -131,7 +118,7 @@ final class CSVCodingTests: XCTestCase {
                 var u: UInt?, u8: UInt8?, u16: UInt16?, u32: UInt32?, u64: UInt64?
             }
             let values = [
-                Test(b: true, d: 0.2, f: 0.2, i: nil, i8: 9, i16: 77, i32: nil, i64: -737, u: 87, u8: 77, u16: 37, u32: 7874, u64: 737333)
+                Test(b: true, d: 0.2, f: 0.2, i8: 9, i64: -737, u: 87, u16: 37, u32: 7874)
             ]
             try XCTAssertEqual(decoder.decode(Test.self, from: encoder.encode(values)), values)
         }
@@ -146,7 +133,6 @@ final class CSVCodingTests: XCTestCase {
             let values = [[1, 2, 3], [1, nil, 9], []]
             try XCTAssertEqual(decoder.decode([Int?].self, from: encoder.encode(values)), values)
         }
-
         do {
             let values = [["sst", "jkj", "uuy"], ["uuh", nil], [nil, nil, nil, nil]]
             let expected: [[String?]] = values.map { array in
@@ -157,7 +143,6 @@ final class CSVCodingTests: XCTestCase {
             }
             try XCTAssertEqual(decoder.decode([String?].self, from: encoder.encode(values)), expected)
         }
-
         do { // Statically call decode(_:), decodeIfPresent(_:)
             struct Test: Codable, Equatable {
                 var s: String, b: Bool?, c: Int?
@@ -191,7 +176,6 @@ final class CSVCodingTests: XCTestCase {
         do {
             try XCTAssertEqual(decoder.decode(Int.self, from: "\n1\n2\n3\n"), [1, 2, 3])
         }
-
         do { // Interesting interaction between Dictionary and Array
             let dictionary = [0: "test", 3: "some"]
             let array = ["test", nil, nil, "some"]
@@ -201,7 +185,6 @@ final class CSVCodingTests: XCTestCase {
             try XCTAssertEqual(decoder.decode([String?].self, from: encoder.encode([dictionary])), [["test"]])
             try XCTAssertEqual(decoder.decode([String?].self, from: encoder.encode([array])), [array])
         }
-
         do {
             struct Test: Encodable {
                 var duplicatedValue: String? = nil, addExtraKey = false
@@ -280,30 +263,6 @@ final class CSVCodingTests: XCTestCase {
             try XCTAssertThrowsError(decoder.decode(Int.self, from: "b,a,a,d\n,,,")) // Duplicated field `a`
             try XCTAssertThrowsError(decoder.decode(Int.self, from: "b,,,d\n,,,")) // Duplicated field ``
             try XCTAssertThrowsError(decoder.decode(Int.self, from: "\"")) // Invalid CSV
-        }
-    }
-
-    func testDecoding() throws {
-        try XCTAssertEqual(decoder.decode([Int?].self, from: "0,1,3\n\"1\",2,"), [[1, 2]])
-        try XCTAssertEqual(decoder.decode([Int?].self, from: "a,b,c\n\"1\",2,"), [[]])
-        do {
-            struct Test: Decodable, Equatable {
-                var a: Int?, b: Int?, c: Int?
-
-                init(a: Int?, b: Int?, c: Int?) {
-                    self.a = a
-                    self.b = b
-                    self.c = c
-                }
-
-                init(from decoder: Decoder) throws {
-                    var container = try decoder.unkeyedContainer()
-                    a = try container.decodeIfPresent(Int.self)
-                    b = try container.decodeIfPresent(Int.self)
-                    c = try container.decodeIfPresent(Int.self)
-                }
-            }
-            try XCTAssertEqual(decoder.decode(Test.self, from: "0,2,1\n1,2,"), [Test(a: 1, b: nil, c: 2)])
         }
     }
 
@@ -437,7 +396,6 @@ final class CSVCodingTests: XCTestCase {
         ("testUnkeyedRoundtrip", testUnkeyedRoundtrip),
 
         ("testBehaviours", testBehaviours),
-        ("testDecoding", testDecoding),
 
         ("testNestedKeyedContainers", testNestedKeyedContainers),
         ("testNestedUnkeyedContainer", testNestedUnkeyedContainer),

@@ -26,53 +26,53 @@ final class CSVCodingTests: XCTestCase {
             ,
             """
             let tokens = UnescapedCSVTokens(base: value)
-            XCTAssert(tokens.elementsEqual([
+            XCTAssertEqual(Array(tokens), [
                 .unescaped("a"), .escaped("l"), .unescaped(""), .escaped(""), .rowBoundary,
                 .unescaped(""), .rowBoundary,
                 .escaped("llk\"d"), .unescaped("jjkk"), .rowBoundary,
                 .unescaped(""), .unescaped(""), .rowBoundary,
-            ]))
+            ])
         }
         do {
             let value = "\"ghghg\""
             let tokens = UnescapedCSVTokens(base: value)
-            XCTAssert(tokens.elementsEqual([
+            XCTAssertEqual(Array(tokens), [
                 .escaped("ghghg"), .rowBoundary
-            ]))
+            ])
         }
         do {
             let value = "ghghg"
             let tokens = UnescapedCSVTokens(base: value)
-            XCTAssert(tokens.elementsEqual([
+            XCTAssertEqual(Array(tokens), [
                 .unescaped("ghghg"), .rowBoundary
-            ]))
+            ])
         }
         do {
             let value = """
             a,l,alskl",asd\n
             """
             let tokens = UnescapedCSVTokens(base: value)
-            XCTAssert(tokens.elementsEqual([
+            XCTAssertEqual(Array(tokens), [
                 .unescaped("a"), .unescaped("l"), .invalid(.unescapedQuote)
-            ]))
+            ])
         }
         do {
             let value = """
             "a\"k\n
             """
             let tokens = UnescapedCSVTokens(base: value)
-            XCTAssert(tokens.elementsEqual([
+            XCTAssertEqual(Array(tokens), [
                 .invalid(.invalidEscaping("k"))
-            ]))
+            ])
         }
         do {
             let value = """
             "a\""hjhu\n
             """
             let tokens = UnescapedCSVTokens(base: value)
-            XCTAssert(tokens.elementsEqual([
+            XCTAssertEqual(Array(tokens), [
                 .invalid(.unclosedQoute)
-            ]))
+            ])
         }
     }
 

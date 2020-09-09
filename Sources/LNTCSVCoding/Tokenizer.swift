@@ -25,69 +25,60 @@ struct UnescapedCSVTokens<S: StringProtocol>: Sequence {
 
     struct Iterator: IteratorProtocol {
         enum State {
-            case expecting, rowBoundary, ended
+            case expecting, rowBoundary, end
         }
-
         var remaining: S.SubSequence, state = State.expecting
 
-        /// Consumes a token and one character after it (if it exists).
-        mutating func nextToken() throws -> (Token, separator: Bool) {
-            defer { remaining = remaining.dropFirst() }
+        mutating func next() -> Token? {
+            switch state {
+            case .expecting:
+                defer {
+                    if remaining.first != separator, state != .end {
+                        state = .rowBoundary
+                    }
+                    remaining = remaining.dropFirst()
+                }
 
-            let first = remaining.first
-            switch first {
-            case _ where first?.isNewline ?? true, separator:
-                return (.unescaped(""), first == separator)
-            case "\"":
-                // Escaping
-                var escaped = ""
+                guard remaining.first != "\"" else {
+                    // Escaping
+                    remaining.removeFirst()
+                    var escaped = ""
+                    while let index = remaining.firstIndex(of: "\"") {
+                        escaped.append(contentsOf: remaining[..<index])
+                        remaining = remaining[remaining.index(after: index)...]
 
-                remaining.removeFirst()
-                while let index = remaining.firstIndex(of: "\"") {
-                    escaped.append(contentsOf: remaining.prefix(upTo: index))
-                    remaining = remaining.suffix(from: remaining.index(after: index))
-
-                    let current = remaining.first
-                    switch current {
-                    case "\"": escaped.append(contentsOf: "\"")
-                    case _ where current?.isNewline ?? true, separator:
-                        return (.escaped(escaped), current == separator)
-                    default: throw TokenizationError.invalidEscaping(current!)
+                        let first = remaining.first
+                        switch first {
+                        case "\"":
+                            remaining.removeFirst()
+                            escaped.append("\"")
+                        case _ where first?.isNewline ?? true, separator:
+                            return .escaped(escaped)
+                        default:
+                            state = .end
+                            return .invalid(.invalidEscaping(first!))
+                        }
                     }
 
-                    remaining.removeFirst()
+                    state = .end
+                    return .invalid(.unclosedQoute)
                 }
 
-                throw TokenizationError.unclosedQoute
-            default:
                 // Non-escaping
                 let pivot = remaining.firstIndex { $0 == separator || $0.isNewline } ?? remaining.endIndex
-                let unescaped = remaining.prefix(upTo: pivot)
-                remaining = remaining.suffix(from: pivot)
+                let unescaped = remaining[..<pivot]
+                remaining = remaining[pivot...]
 
                 guard !unescaped.contains("\"") else {
-                    throw TokenizationError.unescapedQuote
+                    state = .end
+                    return .invalid(.unescapedQuote)
                 }
 
-                return (.unescaped(String(unescaped)), remaining.first == separator)
-            }
-        }
-
-        mutating func next() -> Token? {
-            do {
-                switch state {
-                case .expecting:
-                    let (token, separator) = try nextToken()
-                    state = separator ? .expecting : .rowBoundary
-                    return token
-                case .rowBoundary:
-                    state = remaining.isEmpty ? .ended : .expecting
-                    return .rowBoundary
-                case .ended: return nil
-                }
-            } catch {
-                state = .ended
-                return .invalid(error as! TokenizationError)
+                return .unescaped(.init(unescaped))
+            case .rowBoundary:
+                state = remaining.isEmpty ? .end : .expecting
+                return .rowBoundary
+            case .end: return nil
             }
         }
     }

@@ -60,7 +60,7 @@ extension CodingContext where Shared == SharedEncodingContext {
         }
     }
 
-    var fieldName: String {
+    private var fieldName: String {
         path.expanded.map { $0.stringValue }.joined(separator: shared.subheaderSeparator)
     }
 }
@@ -72,13 +72,9 @@ struct CSVInternalEncoder: ContextContainer, Encoder {
     let context: CodingContext<SharedEncodingContext>
 
     func container<Key>(keyedBy type: Key.Type) -> KeyedEncodingContainer<Key> where Key: CodingKey {
-        .init(CSVKeyedEncodingContainer(encoder: self))
+        .init(CSVKeyedEncodingContainer(context: context))
     }
-    
-    func unkeyedContainer() -> UnkeyedEncodingContainer {
-        CSVUnkeyedEncodingContainer(encoder: self)
-    }
-    
+    func unkeyedContainer() -> UnkeyedEncodingContainer { CSVUnkeyedEncodingContainer(context: context) }
     func singleValueContainer() -> SingleValueEncodingContainer { self }
 }
 
@@ -86,10 +82,6 @@ struct CSVInternalEncoder: ContextContainer, Encoder {
 
 private struct CSVKeyedEncodingContainer<Key: CodingKey>: ContextContainer, KeyedEncodingContainerProtocol {
     let context: CodingContext<SharedEncodingContext>
-
-    init(encoder: CSVInternalEncoder) {
-        self.context = encoder.context
-    }
 
     private func encoder(forKey key: CodingKey) -> CSVInternalEncoder {
         .init(context: context.appending(key))
@@ -135,15 +127,10 @@ private struct CSVUnkeyedEncodingContainer: ContextContainer, UnkeyedEncodingCon
 
     let context: CodingContext<SharedEncodingContext>
 
-    init(encoder: CSVInternalEncoder) {
-        self.context = encoder.context
-    }
-
     private mutating func consumeContext() -> CodingContext<SharedEncodingContext> {
         defer { count += 1 }
         return context.appending(UnkeyedCodingKey(intValue: count))
     }
-
     private mutating func consumeEncoder() -> CSVInternalEncoder {
         .init(context: consumeContext())
     }
@@ -158,7 +145,7 @@ private struct CSVUnkeyedEncodingContainer: ContextContainer, UnkeyedEncodingCon
     mutating func superEncoder() -> Encoder { consumeEncoder() }
     mutating func nestedUnkeyedContainer() -> UnkeyedEncodingContainer { consumeEncoder().unkeyedContainer() }
     mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> where NestedKey: CodingKey {
-        .init(CSVKeyedEncodingContainer(encoder: consumeEncoder()))
+        .init(CSVKeyedEncodingContainer(context: consumeContext()))
     }
 }
 

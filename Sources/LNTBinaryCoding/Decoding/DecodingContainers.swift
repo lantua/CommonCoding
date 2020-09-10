@@ -38,8 +38,6 @@ extension CodingContext where Shared == SharedDecodingContext {
         }
         return shared.strings[index]
     }
-
-    var test: Int { 44 }
 }
 
 // MARK: Encoder

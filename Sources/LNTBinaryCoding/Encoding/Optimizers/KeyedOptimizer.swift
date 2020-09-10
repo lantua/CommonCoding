@@ -60,15 +60,13 @@ struct KeyedOptimizer: EncodingOptimizer {
                 data.removeFirst(size)
             }
         case let .equisizeKeyed(header):
-            let size = header.size
-            for value in values.values {
-                value.write(to: data.prefix(size))
-                data.removeFirst(size)
-            }
-        case let .uniformKeyed(header):
             let size = header.payloadSize
             for value in values.values {
-                value.writePayload(to: data.prefix(size))
+                if header.subheader != nil {
+                    value.writePayload(to: data.prefix(size))
+                } else {
+                    value.write(to: data.prefix(size))
+                }
                 data.removeFirst(size)
             }
         default: fatalError("Unreachable")
@@ -84,7 +82,7 @@ private extension KeyedOptimizer {
 
     func equisizeSize(keys: [Int]) -> (header: Header, payload: Int) {
         let maxSize = values.values.map { $0.size }.reduce(0, max)
-        return (.equisizeKeyed(.init(size: maxSize, keys: keys)), maxSize * keys.count)
+        return (.equisizeKeyed(.init(itemSize: maxSize, subheader: nil, keys: keys)), maxSize * keys.count)
     }
 
     func uniformSize(keys: [Int]) -> (header: Header, payload: Int)? {
@@ -92,6 +90,6 @@ private extension KeyedOptimizer {
             return nil
         }
 
-        return (.uniformKeyed(.init(itemSize: elementSize, subheader: subheader, keys: keys)), (elementSize - subheader.size) * keys.count)
+        return (.equisizeKeyed(.init(itemSize: elementSize, subheader: subheader, keys: keys)), (elementSize - subheader.size) * keys.count)
     }
 }

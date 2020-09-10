@@ -16,9 +16,11 @@ extension Header {
         case let .regularKeyed(header):
             return 2 + header.mapping.lazy.map { $0.key.vsuiSize + $0.size.vsuiSize }.reduce(0, +)
         case let .equisizeKeyed(header):
-            return 2 + header.size.vsuiSize + header.keys.lazy.map { $0.vsuiSize }.reduce(0, +)
-        case let .uniformKeyed(header):
-            return 2 + header.itemSize.vsuiSize + header.subheader.size + header.keys.lazy.map { $0.vsuiSize }.reduce(0, +)
+            if let subheader = header.subheader {
+                return 2 + header.itemSize.vsuiSize + subheader.size + header.keys.lazy.map { $0.vsuiSize }.reduce(0, +)
+            } else {
+                return 2 + header.payloadSize.vsuiSize + header.keys.lazy.map { $0.vsuiSize }.reduce(0, +)
+            }
         case let .regularUnkeyed(header):
             return 2 + header.sizes.lazy.map { $0.vsuiSize }.reduce(0, +)
         case let .equisizeUnkeyed(header):
@@ -52,18 +54,12 @@ extension Header {
             }
             append(0x01)
         case let .equisizeKeyed(header):
-            header.size.write(to: &data)
-            for key in header.keys {
-                key.write(to: &data)
-            }
-            append(0x00)
-        case let .uniformKeyed(header):
             header.itemSize.write(to: &data)
             for key in header.keys {
                 key.write(to: &data)
             }
             append(0x00)
-            header.subheader.write(to: &data)
+            header.subheader?.write(to: &data)
         case let .regularUnkeyed(header):
             for size in header.sizes {
                 size.write(to: &data)

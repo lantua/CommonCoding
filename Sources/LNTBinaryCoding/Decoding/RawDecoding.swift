@@ -51,7 +51,7 @@ extension Data {
         case .string: return .string
         case .regularKeyed: return try .regularKeyed(extractRegularKeyedHeader())
         case .equisizeKeyed: return try .equisizeKeyed(extractEquisizedKeyedHeader())
-        case .uniformKeyed: return try .uniformKeyed(extractUniformKeyedHeader())
+        case .uniformKeyed: return try .equisizeKeyed(extractUniformKeyedHeader())
         case .regularUnkeyed: return try .regularUnkeyed(extractRegularUnkeyedHeader())
         case .equisizeUnkeyed: return try .equisizeUnkeyed(extractEquisizedUnkeyedHeader())
         case .uniformUnkeyed: return try .uniformUnkeyed(extractUniformUnkeyedHeader())
@@ -82,10 +82,10 @@ private extension Data {
             keyIndex = try extractVSUI()
         }
 
-        return .init(size: size, keys: keys)
+        return .init(itemSize: size, subheader: nil, keys: keys)
     }
 
-    mutating func extractUniformKeyedHeader() throws -> UniformKeyedHeader {
+    mutating func extractUniformKeyedHeader() throws -> EquisizeKeyedHeader {
         let itemSize = try extractVSUI()
         var keys: [Int] = []
         var keyIndex = try extractVSUI()

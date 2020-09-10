@@ -100,16 +100,6 @@ struct KeyedBinaryDecodingContainer<Key>: ContextContainer, KeyedDecodingContain
             }
             sharedHeader = nil
         case let .equisizeKeyed(header):
-            let size = header.size
-            guard data.count >= size * header.keys.count else {
-                throw BinaryDecodingError.containerTooSmall
-            }
-            for key in header.keys {
-                try tmp[context.string(at: key)] = data.prefix(size)
-                data.removeFirst(size)
-            }
-            sharedHeader = nil
-        case let .uniformKeyed(header):
             let size = header.payloadSize
             guard data.count >= size * header.keys.count else {
                 throw BinaryDecodingError.containerTooSmall

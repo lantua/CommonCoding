@@ -11,9 +11,3 @@ enum BinaryDecodingError: Error {
     case invalidVSUI, invalidString, invalidTag, invalidStringMapIndex
     case emptyFile, invalidFileVersion, containerTooSmall
 }
-
-extension DecodingContext {
-    func error(_ description: String = "", error: Error? = nil) -> DecodingError.Context {
-        .init(codingPath: codingPath, debugDescription: description, underlyingError: error)
-    }
-}

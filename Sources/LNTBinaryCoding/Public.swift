@@ -11,16 +11,7 @@ public struct BinaryDecoder {
     public var userInfo: [CodingUserInfoKey: Any] = [:]
 
     public func decode<T>(_: T.Type, from data: Data) throws -> T where T: Decodable {
-        var data = data
-        let decoder: InternalDecoder
-        do {
-            let context = try DecodingContext(userInfo: userInfo, data: &data)
-            let header = try data.extractHeader()
-            decoder = .init(header: header, data: data, context: context)
-        } catch {
-            throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Invalid file format", underlyingError: error))
-        }
-        return try .init(from: decoder)
+        return try .init(from: InternalDecoder(data: data, userInfo: userInfo))
     }
 }
 

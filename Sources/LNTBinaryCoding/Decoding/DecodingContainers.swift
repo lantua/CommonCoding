@@ -8,19 +8,12 @@
 import Foundation
 import LNTSharedCoding
 
-typealias HeaderData = (header: Header, data: Data)
-
 // MARK: Context
 
-struct DecodingContext {
-    private let strings: [String], path: CodingPath
+struct SharedDecodingContext {
+    let strings: [String]
 
-    let userInfo: [CodingUserInfoKey: Any]
-    var codingPath: [CodingKey] { path.codingPath }
-}
-
-extension DecodingContext {
-    init(userInfo: [CodingUserInfoKey: Any], data: inout Data) throws {
+    init(data: inout Data) throws {
         guard data.count >= 2 else {
             throw BinaryDecodingError.emptyFile
         }
@@ -31,45 +24,29 @@ extension DecodingContext {
         }
 
         let count = try data.extractVSUI()
-
-        self.userInfo = userInfo
-        self.path = .root
         self.strings = try (0..<count).map { _ in
             try data.extractString()
         }
     }
 }
 
-extension DecodingContext {
-    /// Returns new context with coding path being appended by `key`.
-    func appending(_ key: CodingKey) -> DecodingContext {
-        .init(strings: strings, path: .child(key: key, parent: path), userInfo: userInfo)
-    }
-
+extension CodingContext where Shared == SharedDecodingContext {
     func string(at index: Int) throws -> String {
         let index = index - 1
-        guard strings.indices ~= index else {
+        guard shared.strings.indices ~= index else {
             throw BinaryDecodingError.invalidStringMapIndex
         }
-        return strings[index]
+        return shared.strings[index]
     }
-}
 
-// MARK: Protocols
-
-private protocol ContextContainer {
-    var context: DecodingContext { get }
-}
-
-extension ContextContainer {
-    public var userInfo: [CodingUserInfoKey: Any] { context.userInfo }
-    public var codingPath: [CodingKey] { context.codingPath }
+    var test: Int { 44 }
 }
 
 // MARK: Encoder
 
 struct InternalDecoder: ContextContainer, Decoder {
-    var header: Header, data: Data, context: DecodingContext
+    var header: Header, data: Data
+    public var context: CodingContext<SharedDecodingContext>
 
     func container<Key>(keyedBy type: Key.Type) throws -> KeyedDecodingContainer<Key> where Key : CodingKey {
         try .init(KeyedBinaryDecodingContainer(decoder: self))
@@ -78,10 +55,19 @@ struct InternalDecoder: ContextContainer, Decoder {
     func singleValueContainer() throws -> SingleValueDecodingContainer { self }
 }
 
+extension InternalDecoder {
+    init(data: Data, userInfo: [CodingUserInfoKey: Any]) throws {
+        var data = data
+        context = try .init(.init(data: &data), userInfo: userInfo)
+        header = try data.extractHeader()
+        self.data = data
+    }
+}
+
 // MARK: Keyed Container
 
-struct KeyedBinaryDecodingContainer<Key>: ContextContainer, KeyedDecodingContainerProtocol where Key: CodingKey {
-    let values: [String: Data], sharedHeader: Header?, context: DecodingContext
+private struct KeyedBinaryDecodingContainer<Key>: ContextContainer, KeyedDecodingContainerProtocol where Key: CodingKey {
+    let values: [String: Data], sharedHeader: Header?, context: CodingContext<SharedDecodingContext>
 
     init(decoder: InternalDecoder) throws {
         self.context = decoder.context
@@ -143,9 +129,9 @@ struct KeyedBinaryDecodingContainer<Key>: ContextContainer, KeyedDecodingContain
 
 // MARK: Unkeyed Container
 
-struct UnkeyedBinaryDecodingContainer: ContextContainer, UnkeyedDecodingContainer {
+private struct UnkeyedBinaryDecodingContainer: ContextContainer, UnkeyedDecodingContainer {
     private var values: ArraySlice<Data>
-    let sharedHeader: Header?, context: DecodingContext
+    let sharedHeader: Header?, context: CodingContext<SharedDecodingContext>
 
     let count: Int?
     var currentIndex = 0

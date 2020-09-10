@@ -38,19 +38,19 @@ final class SharedCodingTests: XCTestCase {
     func testCodingPath() {
         var codingPath = CodingPath.root
         do {
-            let codingPath = codingPath.codingPath
+            let codingPath = codingPath.expanded
             XCTAssert(codingPath.isEmpty)
         }
         codingPath = .child(key: UnkeyedCodingKey(intValue: 3), parent: codingPath)
         do {
-            let codingPath = codingPath.codingPath
+            let codingPath = codingPath.expanded
             XCTAssert(codingPath.count == 1)
             XCTAssert(codingPath[0] is UnkeyedCodingKey)
             XCTAssert(codingPath[0].intValue == 3)
         }
         codingPath = .child(key: SuperCodingKey(), parent: codingPath)
         do {
-            let codingPath = codingPath.codingPath
+            let codingPath = codingPath.expanded
             XCTAssert(codingPath.count == 2)
             XCTAssert(codingPath[0] is UnkeyedCodingKey)
             XCTAssert(codingPath[0].intValue == 3)

@@ -25,7 +25,7 @@ struct EncodingContext {
     var path: CodingPath = .root
 
     var userInfo: [CodingUserInfoKey: Any] { shared.userInfo }
-    var codingPath: [CodingKey] { path.codingPath }
+    var codingPath: [CodingKey] { path.expanded }
 
     init(userInfo: [CodingUserInfoKey: Any]) {
         shared = .init(userInfo: userInfo)

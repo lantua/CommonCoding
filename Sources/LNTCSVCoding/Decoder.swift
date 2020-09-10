@@ -9,71 +9,53 @@ import LNTSharedCoding
 
 // MARK: Context
 
-/// Decoding context, shared between all internal decoders, containers, etc. during single-element decoding process.
-struct DecodingContext {
-    private let decoder: CSVDecoder
-    /// Field values, sorted by column.
-    private let values: [String?]
-
-    var userInfo: [CodingUserInfoKey: Any] { decoder.userInfo }
-
-    init(decoder: CSVDecoder, values: [String?]) {
-        self.decoder = decoder
-        self.values = values
-    }
-
-    /// Returns value at given (schema, coding path), converted to type `T`.
-    func value<T>(at scope: (Schema, [CodingKey])) throws -> T where T: LosslessStringConvertible {
-        guard let index = scope.0.getValue() else {
-            throw DecodingError.typeMismatch(T.self, .init(codingPath: scope.1, debugDescription: "Multi-field object found"))
+struct SharedDecodingContext {
+    let values: [String?]
+}
+extension CodingContext where Shared == SharedDecodingContext {
+    func value<T>(at schema: Schema) throws -> T where T: LosslessStringConvertible {
+        guard let index = schema.getValue() else {
+            throw DecodingError.typeMismatch(T.self, error("Multi-field object found"))
         }
-        guard let string = values[index] else {
-            throw DecodingError.valueNotFound(String.self, .init(codingPath: scope.1, debugDescription: ""))
+        guard let string = shared.values[index] else {
+            throw DecodingError.valueNotFound(String.self, error())
         }
         guard let result = T(string) else {
-            throw DecodingError.typeMismatch(T.self, .init(codingPath: scope.1, debugDescription: "Trying to decode `\(string)`"))
+            throw DecodingError.typeMismatch(T.self, error("Trying to decode `\(string)`"))
         }
 
         return result
     }
 
     func hasValue(at schema: Schema) -> Bool {
-        schema.contains { values[$0] != nil }
+        schema.contains { shared.values[$0] != nil }
     }
 }
 
 // MARK: Decoder
 
 /// Internal decoder. This is what the `Decodable` uses when decoding
-struct CSVInternalDecoder: Decoder {
-    let context: DecodingContext, schema: Schema, codingPath: [CodingKey]
+struct CSVInternalDecoder: ContextContainer, Decoder {
+    let context: CodingContext<SharedDecodingContext>, schema: Schema
 
-    var userInfo: [CodingUserInfoKey: Any] { context.userInfo }
-    var scope: (Schema, [CodingKey]) { (schema, codingPath) }
-    
-    init(context: DecodingContext, scope: (Schema, [CodingKey])) {
-        self.context = context
-        (schema, codingPath) = scope
-    }
-    
     func container<Key>(keyedBy type: Key.Type) throws -> KeyedDecodingContainer<Key> where Key: CodingKey {
         try .init(CSVKeyedDecodingContainer(decoder: self))
     }
-    
-    func unkeyedContainer() throws -> UnkeyedDecodingContainer {
-        try CSVUnkeyedDecodingContainer(decoder: self)
-    }
-    
+    func unkeyedContainer() throws -> UnkeyedDecodingContainer { try CSVUnkeyedDecodingContainer(decoder: self) }
     func singleValueContainer() throws -> SingleValueDecodingContainer { self }
+}
+
+extension CSVInternalDecoder {
+    init(decoder: CSVDecoder, values: [String?], schema: Schema) {
+        context = .init(.init(values: values), userInfo: decoder.userInfo)
+        self.schema = schema
+    }
 }
 
 // MARK: Keyed Container
 
-private struct CSVKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainerProtocol {
-    let decoder: CSVInternalDecoder, schemas: [String: Schema]
-
-    var context: DecodingContext { decoder.context }
-    var codingPath: [CodingKey] { decoder.codingPath }
+private struct CSVKeyedDecodingContainer<Key: CodingKey>: ContextContainer, KeyedDecodingContainerProtocol {
+    let context: CodingContext<SharedDecodingContext>, schemas: [String: Schema]
 
     var allKeys: [Key] {
         // Includes only keys with non-nil value.
@@ -85,36 +67,30 @@ private struct CSVKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainer
     }
 
     init(decoder: CSVInternalDecoder) throws {
+        self.context = decoder.context
+
         guard let schemas = decoder.schema.getKeyedContainer() else {
-            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "Expecting multi-field object"))
+            throw DecodingError.dataCorrupted(context.error("Expecting multi-field object"))
         }
-        self.decoder = decoder
         self.schemas = schemas
     }
 
     private func schema(forKey key: CodingKey) throws -> Schema {
         guard let schema = schemas[key.stringValue] else {
-            throw DecodingError.keyNotFound(key, .init(codingPath: codingPath, debugDescription: ""))
+            throw DecodingError.keyNotFound(key, context.error())
         }
         return schema
     }
-
-    private func scope(forKey key: CodingKey) throws -> (Schema, [CodingKey]) {
-        try (schema(forKey: key), codingPath + [key])
-    }
-
     private func decoder(forKey key: CodingKey) throws -> CSVInternalDecoder {
-        try .init(context: context, scope: scope(forKey: key))
+        try .init(context: context.appending(key), schema: schema(forKey: key))
     }
     
     func contains(_ key: Key) -> Bool { schemas[key.stringValue] != nil }
-    
-    func decodeNil(forKey key: Key) throws -> Bool {
-        try !context.hasValue(at: schema(forKey: key))
-    }
+
+    func decodeNil(forKey key: Key) throws -> Bool { try !context.hasValue(at: schema(forKey: key)) }
 
     func decode<T>(_: T.Type, forKey key: Key) throws -> T where T: Decodable, T: LosslessStringConvertible {
-        try context.value(at: scope(forKey: key))
+        try context.value(at: schema(forKey: key))
     }
 
     func decode<T>(_: T.Type, forKey key: Key) throws -> T where T: Decodable { try .init(from: decoder(forKey: key)) }
@@ -128,40 +104,37 @@ private struct CSVKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainer
 
 // MARK: Unkeyed Container
 
-private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
-    let decoder: CSVInternalDecoder
-
-    var context: DecodingContext { decoder.context }
-    var codingPath: [CodingKey] { decoder.codingPath }
-    let schemas: [Schema]
+private struct CSVUnkeyedDecodingContainer: ContextContainer, UnkeyedDecodingContainer {
+    let context: CodingContext<SharedDecodingContext>, schemas: [Schema]
     
     let count: Int?
     var currentIndex = 0
     var isAtEnd: Bool { currentIndex == count }
 
     init(decoder: CSVInternalDecoder) throws {
+        self.context = decoder.context
+
         guard let schemas = decoder.schema.getUnkeyedContainer() else {
-            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "Expecting multi-field object"))
+            throw DecodingError.dataCorrupted(context.error("Expecting multi-field object"))
         }
-        self.decoder = decoder
         self.schemas = schemas
         self.count = 1 + (schemas.lastIndex(where: decoder.context.hasValue) ?? -1)
     }
 
-    private mutating func consumeScope() throws -> (Schema, [CodingKey]) {
+    private mutating func consumeSchema() throws -> Schema {
         defer { currentIndex += 1 }
         guard schemas.indices ~= currentIndex else {
-            throw DecodingError.keyNotFound(UnkeyedCodingKey(intValue: currentIndex), .init(codingPath: codingPath, debugDescription: ""))
+            throw DecodingError.keyNotFound(UnkeyedCodingKey(intValue: currentIndex), context.error())
         }
-        return (schemas[currentIndex], codingPath + [UnkeyedCodingKey(intValue: currentIndex)])
+        return schemas[currentIndex]
     }
 
     private mutating func consumeDecoder() throws -> CSVInternalDecoder {
-        try .init(context: context, scope: consumeScope())
+        try .init(context: context, schema: consumeSchema())
     }
 
     mutating func decodeNil() throws -> Bool {
-        let hasValue = try context.hasValue(at: consumeScope().0)
+        let hasValue = try context.hasValue(at: consumeSchema())
         if hasValue {
             currentIndex -= 1
         }
@@ -169,7 +142,7 @@ private struct CSVUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     }
     
     mutating func decode<T>(_: T.Type) throws -> T where T: Decodable, T: LosslessStringConvertible {
-        try context.value(at: consumeScope())
+        try context.appending(UnkeyedCodingKey(intValue: currentIndex)).value(at: consumeSchema())
     }
     
     mutating func decode<T>(_: T.Type) throws -> T where T: Decodable { try .init(from: consumeDecoder()) }
@@ -186,5 +159,5 @@ extension CSVInternalDecoder: SingleValueDecodingContainer {
     func decodeNil() -> Bool { !context.hasValue(at: schema) }
 
     func decode<T>(_: T.Type) throws -> T where T: Decodable { try .init(from: self) }
-    func decode<T>(_: T.Type) throws -> T where T: Decodable, T: LosslessStringConvertible { try context.value(at: scope) }
+    func decode<T>(_: T.Type) throws -> T where T: Decodable, T: LosslessStringConvertible { try context.value(at: schema) }
 }

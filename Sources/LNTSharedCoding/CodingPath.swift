@@ -12,11 +12,11 @@ public enum CodingPath {
     case root
     indirect case child(key: CodingKey, parent: CodingPath)
 
-    public var codingPath: [CodingKey] {
+    public var expanded: [CodingKey] {
         switch self {
         case .root: return []
         case let .child(key: key, parent: parent):
-            return parent.codingPath + CollectionOfOne(key)
+            return parent.expanded + CollectionOfOne(key)
         }
     }
 }

@@ -5,6 +5,8 @@
 //  Created by Natchanon Luangsomboon on 1/8/2562 BE.
 //
 
+import LNTSharedCoding
+
 let separator: Character = ","
 
 public struct CSVEncodingOptions: OptionSet {
@@ -25,10 +27,10 @@ public struct CSVEncoder {
     public var options: CSVEncodingOptions
     public var userInfo: [CodingUserInfoKey: Any]
     
-    private let subheaderSeparator: String
+    let subheaderSeparator: Character
     
     public init(subheaderSeparator: Character = ".", options: CSVEncodingOptions = [], userInfo: [CodingUserInfoKey: Any] = [:]) {
-        self.subheaderSeparator = String(subheaderSeparator)
+        self.subheaderSeparator = subheaderSeparator
         self.options = options
         self.userInfo = userInfo
     }
@@ -42,11 +44,6 @@ public struct CSVEncoder {
         }
     }
 
-    /// Returns field name at given `codingPath`
-    func field(for codingPath: [CodingKey]) -> String {
-        return codingPath.map { $0.stringValue }.joined(separator: subheaderSeparator)
-    }
-
     public func encode<S>(_ values: S) throws -> String where S: Sequence, S.Element: Encodable {
         var result = ""
         try encode(values, into: &result)
@@ -57,8 +54,8 @@ public struct CSVEncoder {
         var fieldIndices: [String: Int]?
         
         for value in values {
-            let context = EncodingContext(encoder: self, fieldIndices: fieldIndices)
-            let encoder = CSVInternalEncoder(context: context, codingPath: [])
+            let context = SharedEncodingContext(encoder: self, fieldIndices: fieldIndices)
+            let encoder = CSVInternalEncoder(context: .init(context, userInfo: userInfo))
             try value.encode(to: encoder)
             
             let (currentFieldIndices, entry) = context.finalize()
@@ -133,9 +130,8 @@ public struct CSVDecoder {
                 guard buffer.count == fieldCount else {
                     throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Each row must have equal number of fields"))
                 }
-                
-                let context = DecodingContext(decoder: self, values: buffer)
-                let decoder = CSVInternalDecoder(context: context, scope: (schema, []))
+
+                let decoder = CSVInternalDecoder(decoder: self, values: buffer, schema: schema)
                 try results.append(T(from: decoder))
             }
         }

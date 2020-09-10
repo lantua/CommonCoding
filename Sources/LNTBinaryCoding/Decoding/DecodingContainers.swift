@@ -35,7 +35,7 @@ extension DecodingContext {
         self.userInfo = userInfo
         self.path = .root
         self.strings = try (0..<count).map { _ in
-            try data.readString()
+            try data.extractString()
         }
     }
 }
@@ -55,60 +55,92 @@ extension DecodingContext {
     }
 }
 
+// MARK: Protocols
+
+private protocol ContextContainer {
+    var context: DecodingContext { get }
+}
+
+extension ContextContainer {
+    public var userInfo: [CodingUserInfoKey: Any] { context.userInfo }
+    public var codingPath: [CodingKey] { context.codingPath }
+}
+
 // MARK: Encoder
 
-struct InternalDecoder: Decoder {
-    let storage: PartiallyParsedStorage, context: DecodingContext
-
-    init(_ arg: HeaderData, context: DecodingContext) throws {
-        do {
-            self.storage = try .init(arg, context: context)
-        } catch {
-            throw DecodingError.dataCorrupted(context.error(error: error))
-        }
-        self.context = context
-    }
-
-    var userInfo: [CodingUserInfoKey : Any] { context.userInfo }
-    var codingPath: [CodingKey] { context.codingPath }
+struct InternalDecoder: ContextContainer, Decoder {
+    var header: Header, data: Data, context: DecodingContext
 
     func container<Key>(keyedBy type: Key.Type) throws -> KeyedDecodingContainer<Key> where Key : CodingKey {
-        guard case let .keyed(values) = storage else {
-            throw DecodingError.typeMismatch(KeyedDecodingContainer<Key>.self, context.error("Incompatible container found"))
-        }
-
-        return .init(KeyedBinaryDecodingContainer(values: values, context: context))
+        try .init(KeyedBinaryDecodingContainer(decoder: self))
     }
-
-    func unkeyedContainer() throws -> UnkeyedDecodingContainer {
-        guard case let .unkeyed(values) = storage else {
-            throw DecodingError.typeMismatch(UnkeyedDecodingContainer.self, context.error("Incompatible container found"))
-        }
-
-        return UnkeyedBinaryDecodingContainer(values: values, context: context)
-    }
-
+    func unkeyedContainer() throws -> UnkeyedDecodingContainer { try UnkeyedBinaryDecodingContainer(decoder: self) }
     func singleValueContainer() throws -> SingleValueDecodingContainer { self }
 }
 
 // MARK: Keyed Container
 
-struct KeyedBinaryDecodingContainer<Key>: KeyedDecodingContainerProtocol where Key: CodingKey {
-    let values: [String: HeaderData], context: DecodingContext
+struct KeyedBinaryDecodingContainer<Key>: ContextContainer, KeyedDecodingContainerProtocol where Key: CodingKey {
+    let values: [String: Data], sharedHeader: Header?, context: DecodingContext
 
-    var codingPath: [CodingKey] { context.codingPath }
+    init(decoder: InternalDecoder) throws {
+        self.context = decoder.context
+
+        var data = decoder.data
+        var tmp: [String: Data] = [:]
+
+        switch decoder.header {
+        case let .regularKeyed(header):
+            for (key, size) in header.mapping {
+                guard data.count >= size else {
+                    throw BinaryDecodingError.containerTooSmall
+                }
+                try tmp[context.string(at: key)] = data.prefix(size)
+                data.removeFirst(size)
+            }
+            sharedHeader = nil
+        case let .equisizeKeyed(header):
+            let size = header.size
+            guard data.count >= size * header.keys.count else {
+                throw BinaryDecodingError.containerTooSmall
+            }
+            for key in header.keys {
+                try tmp[context.string(at: key)] = data.prefix(size)
+                data.removeFirst(size)
+            }
+            sharedHeader = nil
+        case let .uniformKeyed(header):
+            let size = header.payloadSize
+            guard data.count >= size * header.keys.count else {
+                throw BinaryDecodingError.containerTooSmall
+            }
+            for key in header.keys {
+                try tmp[context.string(at: key)] = data.prefix(size)
+                data.removeFirst(size)
+            }
+            sharedHeader = header.subheader
+        default: throw DecodingError.typeMismatch(KeyedDecodingContainer<Key>.self, context.error("Incompatible container found"))
+        }
+        values = tmp
+    }
+
     var allKeys: [Key] { values.keys.compactMap(Key.init(stringValue:)) }
     func contains(_ key: Key) -> Bool { values.keys.contains(key.stringValue) }
 
     private func decoder(for key: CodingKey) throws -> InternalDecoder {
-        guard let value = values[key.stringValue] else {
+        guard var data = values[key.stringValue] else {
             throw DecodingError.keyNotFound(key, context.error())
         }
-
-        return try .init(value, context: context.appending(key))
+        let header = try sharedHeader ?? data.extractHeader()
+        return .init(header: header, data: data, context: context.appending(key))
     }
 
-    func decodeNil(forKey key: Key) throws -> Bool { values[key.stringValue]?.header.isNil ?? true }
+    func decodeNil(forKey key: Key) throws -> Bool {
+        guard var data = values[key.stringValue] else {
+            return true
+        }
+        return try (sharedHeader ?? data.extractHeader()).isNil
+    }
 
     func decode<T>(_ type: T.Type, forKey key: Key) throws -> T where T : Decodable { try T(from: decoder(for: key)) }
     func superDecoder() throws -> Decoder { try decoder(for: SuperCodingKey()) }
@@ -121,20 +153,56 @@ struct KeyedBinaryDecodingContainer<Key>: KeyedDecodingContainerProtocol where K
 
 // MARK: Unkeyed Container
 
-struct UnkeyedBinaryDecodingContainer: UnkeyedDecodingContainer {
-    private var values: ArraySlice<HeaderData>
-    let context: DecodingContext
+struct UnkeyedBinaryDecodingContainer: ContextContainer, UnkeyedDecodingContainer {
+    private var values: ArraySlice<Data>
+    let sharedHeader: Header?, context: DecodingContext
 
     let count: Int?
     var currentIndex = 0
 
-    init(values: [HeaderData], context: DecodingContext) {
-        self.values = values[...]
-        self.context = context
-        self.count = values.count
+    init(decoder: InternalDecoder) throws {
+        self.context = decoder.context
+
+        var tmp: [Data] = [], data = decoder.data
+        switch decoder.header {
+        case let .regularUnkeyed(header):
+            tmp.reserveCapacity(header.sizes.count)
+            for size in header.sizes {
+                guard data.count >= size else {
+                    throw BinaryDecodingError.containerTooSmall
+                }
+                tmp.append(data.prefix(size))
+                data.removeFirst(size)
+            }
+            sharedHeader = nil
+        case let .equisizeUnkeyed(header):
+            tmp.reserveCapacity(header.count)
+            let size = header.size
+            guard data.count >= size * header.count else {
+                throw BinaryDecodingError.containerTooSmall
+            }
+            for _ in 0..<header.count {
+                tmp.append(data.prefix(size))
+                data.removeFirst(size)
+            }
+            sharedHeader = nil
+        case let .uniformUnkeyed(header):
+            tmp.reserveCapacity(header.count)
+            let size = header.payloadSize
+            guard data.count >= size * header.count else {
+                throw BinaryDecodingError.containerTooSmall
+            }
+            for _ in 0..<header.count {
+                tmp.append(data.prefix(size))
+                data.removeFirst(size)
+            }
+            sharedHeader = header.subheader
+        default: throw DecodingError.typeMismatch(UnkeyedDecodingContainer.self, context.error("Incompatible container found"))
+        }
+        values = tmp[...]
+        count = values.count
     }
 
-    var codingPath: [CodingKey] { context.codingPath }
     var isAtEnd: Bool { values.isEmpty }
 
     mutating func consumeDecoder() throws -> InternalDecoder {
@@ -143,10 +211,17 @@ struct UnkeyedBinaryDecodingContainer: UnkeyedDecodingContainer {
         }
 
         defer { currentIndex += 1 }
-        return try .init(values.removeFirst(), context: context.appending(UnkeyedCodingKey(intValue: currentIndex)))
+        var data = values.removeFirst()
+        let header = try sharedHeader ?? data.extractHeader()
+        return .init(header: header, data: data, context: context.appending(UnkeyedCodingKey(intValue: currentIndex)))
     }
 
-    mutating func decodeNil() throws -> Bool { values.first?.header.isNil ?? true }
+    mutating func decodeNil() throws -> Bool {
+        guard var data = values.first else {
+            return true
+        }
+        return try (sharedHeader ?? data.extractHeader()).isNil
+    }
 
     mutating func decode<T>(_ type: T.Type) throws -> T where T : Decodable { try T(from: consumeDecoder()) }
     mutating func superDecoder() throws -> Decoder { try consumeDecoder() }
@@ -159,32 +234,36 @@ struct UnkeyedBinaryDecodingContainer: UnkeyedDecodingContainer {
 // MARK: Single Value Container
 
 extension InternalDecoder: SingleValueDecodingContainer {
-    func decodeNil() -> Bool { storage.isNil }
+    func decodeNil() -> Bool {
+        if case .nil = header {
+            return true
+        }
+        return false
+    }
     func decode(_: Bool.Type) throws -> Bool { try decode(UInt8.self) != 0 }
     func decode(_: Float.Type) throws -> Float { try Float(bitPattern: decode(UInt32.self)) }
     func decode(_: Double.Type) throws -> Double { try Double(bitPattern: decode(UInt64.self)) }
 
-    func decode<T>(_: T.Type) throws -> T where T: Decodable, T: BinaryInteger {
+    func decode<T>(_: T.Type) throws -> T where T: Decodable, T: FixedWidthInteger {
         let tmp: T?
-        switch storage {
-        case let .signed(value): tmp = T(exactly: value)
-        case let .unsigned(value): tmp = T(exactly: value)
+        switch header {
+        case .signed: tmp = data.readSigned(T.self)
+        case .unsigned: tmp = data.readUnsigned(T.self)
         default: throw DecodingError.typeMismatch(T.self, context.error("Incompatible container"))
         }
 
         guard let result = tmp else {
             throw DecodingError.typeMismatch(T.self, context.error("Value out of range"))
         }
-
         return result
     }
 
     func decode(_: String.Type) throws -> String {
-        guard case let .string(result) = storage else {
+        guard case .string = header else {
             throw DecodingError.typeMismatch(String.self, context.error("Incompatible container"))
         }
 
-        return result
+        return try context.string(at: data.readVSUI())
     }
 
     func decode<T>(_ type: T.Type) throws -> T where T : Decodable { try T(from: self) }

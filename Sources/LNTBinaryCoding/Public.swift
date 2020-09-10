@@ -15,7 +15,8 @@ public struct BinaryDecoder {
         let decoder: InternalDecoder
         do {
             let context = try DecodingContext(userInfo: userInfo, data: &data)
-            decoder = try .init(data.splitHeader(), context: context)
+            let header = try data.extractHeader()
+            decoder = .init(header: header, data: data, context: context)
         } catch {
             throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Invalid file format", underlyingError: error))
         }

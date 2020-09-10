@@ -92,7 +92,7 @@ This is different from `SingleValueDecodingContainer` and `SingleValueEncodingCo
 
 ### Signed Integer Types
 
-Types in this category include `Int`, `Int8`, `Int16`, `Int32`, `Int64`. It is stored as a tag followed by the payload in little endian byte order.
+Types in this category include `Int`, `Int8`, `Int16`, `Int32`, `Int64`. It is stored as a tag followed by the payload in little endian byte order. Zero-byte payload is treated as `0`.
 
 This format uses the largest type that fits the payload. For example, if the payload is five-byte long, it will use `Int32`.
 
@@ -104,7 +104,7 @@ This format uses the largest type that fits the payload. For example, if the pay
 
 ### Unsigned Integer Types
 
-Types in this category include `UInt`, `UInt8`, `UInt16`, `UInt32`, `UInt64`. It is stored as a tag followed by the payload in little endian byte order.
+Types in this category include `UInt`, `UInt8`, `UInt16`, `UInt32`, `UInt64`. It is stored as a tag followed by the payload in little endian byte order. Zero-byte payload is treated as `0`.
 
 This format uses the largest type that fits the payload. For example, if the payload is five-byte long, it will use `UInt32`.
 
@@ -218,7 +218,7 @@ This is valid if every item has the same size and header.
 *------------------------------*-----------------------------------------*
 ```
 
-Note that `Size` referes to the size of the item (with header attached) not the size of the payload.
+Note that `Size` refers to the size of the item (with header attached) not the size of the payload.
 
 # Design Note
 

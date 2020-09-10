@@ -313,10 +313,6 @@ final class BinaryCodingTests: XCTestCase {
     }
 
     func testSingleValueError() {
-        // Container Too small
-        try XCTAssertThrowsError(decoder.decode(Int.self, from: Data([0,0,0, Header.Tag.signed.rawValue])))
-        try XCTAssertThrowsError(decoder.decode(UInt.self, from: Data([0,0,0, Header.Tag.unsigned.rawValue])))
-
         // Decoding from nil
         try XCTAssertThrowsError(decoder.decode(Int.self, from: Data([0,0,0,])))
         try XCTAssertThrowsError(decoder.decode(String.self, from: Data([0,0,0,])))

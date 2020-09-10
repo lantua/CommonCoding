@@ -6,7 +6,7 @@
 //
 
 public struct CodingContext<Shared> {
-    public var shared: Shared, userInfo: [CodingUserInfoKey: Any], path: CodingPath
+    public let shared: Shared, userInfo: [CodingUserInfoKey: Any], path: CodingPath
 
     public init(_ shared: Shared, userInfo: [CodingUserInfoKey: Any], path: CodingPath = .root) {
         self.shared = shared
@@ -35,4 +35,3 @@ public extension ContextContainer {
     var userInfo: [CodingUserInfoKey: Any] { context.userInfo }
     var codingPath: [CodingKey] { context.path.expanded }
 }
-

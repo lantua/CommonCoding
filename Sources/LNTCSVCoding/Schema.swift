@@ -43,7 +43,6 @@ enum Schema {
         guard case let .nested(data) = self else {
             return nil
         }
-
         return data
     }
 

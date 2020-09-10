@@ -29,9 +29,9 @@ class SharedEncodingContext {
 
 extension CodingContext where Shared == SharedEncodingContext {
     func add(unescaped: String?) throws {
-        let field = fieldName
+        let fieldName = path.expanded.map { $0.stringValue }.joined(separator: shared.subheaderSeparator)
         if shared.isFixed {
-            guard let index = shared.fieldIndices[field] else {
+            guard let index = shared.fieldIndices[fieldName] else {
                 guard unescaped != nil else {
                     // It's fine to add `nil` to non-existing field
                     return
@@ -48,20 +48,16 @@ extension CodingContext where Shared == SharedEncodingContext {
 
             shared.values[index] = unescaped
         } else {
-            if let oldIndex = shared.fieldIndices.updateValue(shared.values.count, forKey: field) {
+            if let oldIndex = shared.fieldIndices.updateValue(shared.values.count, forKey: fieldName) {
                 guard shared.values[oldIndex]! != unescaped else {
                     // It's fine to add same value to duplicated field
-                    shared.fieldIndices.updateValue(oldIndex, forKey: field)
+                    shared.fieldIndices.updateValue(oldIndex, forKey: fieldName)
                     return
                 }
                 throw EncodingError.invalidValue(unescaped as Any, error("Duplicated field"))
             }
             shared.values.append(unescaped)
         }
-    }
-
-    private var fieldName: String {
-        path.expanded.map { $0.stringValue }.joined(separator: shared.subheaderSeparator)
     }
 }
 
@@ -92,12 +88,11 @@ private struct CSVKeyedEncodingContainer<Key: CodingKey>: ContextContainer, Keye
     mutating func encode<T>(_ value: T, forKey key: Key) throws where T: Encodable, T: LosslessStringConvertible {
         try context.appending(key).add(unescaped: String(value))
     }
-
     mutating func encode<T>(_ value: T, forKey key: Key) throws where T: Encodable { try value.encode(to: encoder(forKey: key)) }
+
     mutating func superEncoder() -> Encoder { encoder(forKey: SuperCodingKey()) }
     mutating func superEncoder(forKey key: Key) -> Encoder { encoder(forKey: key) }
     mutating func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer { encoder(forKey: key).unkeyedContainer() }
-    
     mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> where NestedKey: CodingKey {
         encoder(forKey: key).container(keyedBy: NestedKey.self)
     }
@@ -140,8 +135,8 @@ private struct CSVUnkeyedEncodingContainer: ContextContainer, UnkeyedEncodingCon
     mutating func encode<T>(_ value: T) throws where T: Encodable, T: LosslessStringConvertible {
         try consumeContext().add(unescaped: String(value))
     }
-
     mutating func encode<T>(_ value: T) throws where T: Encodable { try value.encode(to: consumeEncoder()) }
+    
     mutating func superEncoder() -> Encoder { consumeEncoder() }
     mutating func nestedUnkeyedContainer() -> UnkeyedEncodingContainer { consumeEncoder().unkeyedContainer() }
     mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> where NestedKey: CodingKey {

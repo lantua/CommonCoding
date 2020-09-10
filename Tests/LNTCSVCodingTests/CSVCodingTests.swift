@@ -23,7 +23,7 @@ final class CSVCodingTests: XCTestCase {
             "llk""d"
             a
             """
-            let tokens = UnescapedCSVTokens(base: value)
+            let tokens = Tokens(base: value)
             XCTAssertEqual(Array(tokens), [
                 .unescaped("a"), .escaped("b"), .unescaped(""), .escaped(""), .rowBoundary,
                 .unescaped(""), .rowBoundary,
@@ -33,7 +33,7 @@ final class CSVCodingTests: XCTestCase {
         }
         do {
             let value = "\"test\""
-            let tokens = UnescapedCSVTokens(base: value)
+            let tokens = Tokens(base: value)
             XCTAssertEqual(Array(tokens), [
                 .escaped("test"), .rowBoundary
             ])
@@ -42,21 +42,21 @@ final class CSVCodingTests: XCTestCase {
             let value = """
             a,b,bad",
             """
-            let tokens = UnescapedCSVTokens(base: value)
+            let tokens = Tokens(base: value)
             XCTAssertEqual(Array(tokens), [
                 .unescaped("a"), .unescaped("b"), .invalid(.unescapedQuote)
             ])
         }
         do {
             let value = #""a\"k""#
-            let tokens = UnescapedCSVTokens(base: value)
+            let tokens = Tokens(base: value)
             XCTAssertEqual(Array(tokens), [
                 .invalid(.invalidEscaping("k"))
             ])
         }
         do {
             let value = #""un""closed"#
-            let tokens = UnescapedCSVTokens(base: value)
+            let tokens = Tokens(base: value)
             XCTAssertEqual(Array(tokens), [
                 .invalid(.unclosedQoute)
             ])
@@ -404,8 +404,8 @@ final class CSVCodingTests: XCTestCase {
     ]
 }
 
-extension UnescapedCSVTokens.Token: Equatable {
-    public static func == (lhs: UnescapedCSVTokens<S>.Token, rhs: UnescapedCSVTokens<S>.Token) -> Bool {
+extension Tokens.Token: Equatable {
+    public static func == (lhs: Tokens<S>.Token, rhs: Tokens<S>.Token) -> Bool {
         switch (lhs, rhs) {
         case let (.escaped(l), .escaped(r)) where l == r,
              let (.unescaped(l), .unescaped(r)) where l == r:

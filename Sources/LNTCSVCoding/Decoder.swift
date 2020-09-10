@@ -144,8 +144,8 @@ private struct CSVUnkeyedDecodingContainer: ContextContainer, UnkeyedDecodingCon
     mutating func decode<T>(_: T.Type) throws -> T where T: Decodable, T: LosslessStringConvertible {
         try context.appending(UnkeyedCodingKey(intValue: currentIndex)).value(at: consumeSchema())
     }
-    
     mutating func decode<T>(_: T.Type) throws -> T where T: Decodable { try .init(from: consumeDecoder()) }
+    
     mutating func superDecoder() throws -> Decoder { try consumeDecoder() }
     mutating func nestedUnkeyedContainer() throws -> UnkeyedDecodingContainer { try consumeDecoder().unkeyedContainer() }
     mutating func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type) throws -> KeyedDecodingContainer<NestedKey> where NestedKey: CodingKey {

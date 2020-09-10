@@ -102,7 +102,7 @@ public struct CSVDecoder {
     
     public func decode<S, T>(_ type: T.Type, from string: S) throws -> [T] where S: StringProtocol, T: Decodable {
         var buffer: [String?] = [], schema: Schema!, fieldCount: Int?, results: [T] = []
-        for token in UnescapedCSVTokens(base: string) {
+        for token in Tokens(base: string) {
             switch token {
             case let .escaped(string): buffer.append(string)
             case let .unescaped(string):

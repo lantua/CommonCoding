@@ -13,7 +13,7 @@ import LNTSharedCoding
 struct SharedDecodingContext {
     let strings: [String]
 
-    init(data: inout Data) throws {
+    fileprivate init(data: inout Data) throws {
         guard data.count >= 2 else {
             throw BinaryDecodingError.emptyFile
         }
@@ -115,8 +115,8 @@ private struct KeyedBinaryDecodingContainer<Key>: ContextContainer, KeyedDecodin
         }
         return try (sharedHeader ?? data.extractHeader()).isNil
     }
-
     func decode<T>(_ type: T.Type, forKey key: Key) throws -> T where T : Decodable { try T(from: decoder(for: key)) }
+
     func superDecoder() throws -> Decoder { try decoder(for: SuperCodingKey()) }
     func superDecoder(forKey key: Key) throws -> Decoder { try decoder(for: key) }
     func nestedUnkeyedContainer(forKey key: Key) throws -> UnkeyedDecodingContainer { try decoder(for: key).unkeyedContainer() }
@@ -185,8 +185,8 @@ private struct UnkeyedBinaryDecodingContainer: ContextContainer, UnkeyedDecoding
         }
         return try (sharedHeader ?? data.extractHeader()).isNil
     }
-
     mutating func decode<T>(_ type: T.Type) throws -> T where T : Decodable { try T(from: consumeDecoder()) }
+
     mutating func superDecoder() throws -> Decoder { try consumeDecoder() }
     mutating func nestedUnkeyedContainer() throws -> UnkeyedDecodingContainer { try consumeDecoder().unkeyedContainer() }
     mutating func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type) throws -> KeyedDecodingContainer<NestedKey> where NestedKey : CodingKey {

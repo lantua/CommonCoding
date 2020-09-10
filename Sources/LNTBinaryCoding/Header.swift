@@ -52,8 +52,8 @@ struct EquisizedUnkeyedHeader {
 extension Header {
     enum Tag: UInt8 {
         case `nil` = 0x1, signed = 0x2, unsigned = 0x3, string = 0x4
-        case regularKeyed = 0x10, equisizeKeyed, uniformKeyed
-        case regularUnkeyed = 0x20, equisizeUnkeyed, uniformUnkeyed
+        case regularKeyed = 0x10, equisizeKeyed = 0x11, uniformKeyed = 0x12
+        case regularUnkeyed = 0x20, equisizeUnkeyed = 0x21, uniformUnkeyed = 0x22
     }
 
     var tag: Tag {

@@ -7,7 +7,7 @@
 
 /// Sequence of tokens given the csv content. The tokens may be de-escaped
 /// string (with escaping information), row boundary, and parsing error.
-struct UnescapedCSVTokens<S: StringProtocol>: Sequence {
+struct Tokens<S: StringProtocol>: Sequence {
     let base: S
 
     enum Token {
@@ -39,7 +39,7 @@ struct UnescapedCSVTokens<S: StringProtocol>: Sequence {
                     remaining = remaining.dropFirst()
                 }
 
-                guard remaining.first != "\"" else {
+                if remaining.first == "\"" {
                     // Escaping
                     remaining.removeFirst()
                     var escaped = ""
@@ -62,19 +62,19 @@ struct UnescapedCSVTokens<S: StringProtocol>: Sequence {
 
                     state = .end
                     return .invalid(.unclosedQoute)
+                } else {
+                    // Non-escaping
+                    let pivot = remaining.firstIndex { $0 == separator || $0.isNewline } ?? remaining.endIndex
+                    let unescaped = remaining[..<pivot]
+                    remaining = remaining[pivot...]
+
+                    guard !unescaped.contains("\"") else {
+                        state = .end
+                        return .invalid(.unescapedQuote)
+                    }
+
+                    return .unescaped(.init(unescaped))
                 }
-
-                // Non-escaping
-                let pivot = remaining.firstIndex { $0 == separator || $0.isNewline } ?? remaining.endIndex
-                let unescaped = remaining[..<pivot]
-                remaining = remaining[pivot...]
-
-                guard !unescaped.contains("\"") else {
-                    state = .end
-                    return .invalid(.unescapedQuote)
-                }
-
-                return .unescaped(.init(unescaped))
             case .rowBoundary:
                 state = remaining.isEmpty ? .end : .expecting
                 return .rowBoundary

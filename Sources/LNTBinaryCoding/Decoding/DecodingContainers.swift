@@ -167,17 +167,6 @@ struct UnkeyedBinaryDecodingContainer: ContextContainer, UnkeyedDecodingContaine
             sharedHeader = nil
         case let .equisizeUnkeyed(header):
             tmp.reserveCapacity(header.count)
-            let size = header.size
-            guard data.count >= size * header.count else {
-                throw BinaryDecodingError.containerTooSmall
-            }
-            for _ in 0..<header.count {
-                tmp.append(data.prefix(size))
-                data.removeFirst(size)
-            }
-            sharedHeader = nil
-        case let .uniformUnkeyed(header):
-            tmp.reserveCapacity(header.count)
             let size = header.payloadSize
             guard data.count >= size * header.count else {
                 throw BinaryDecodingError.containerTooSmall

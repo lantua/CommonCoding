@@ -12,7 +12,6 @@ enum Header {
     case signed, unsigned
     case regularKeyed(RegularKeyedHeader), regularUnkeyed(RegularUnkeyedHeader)
     indirect case equisizeKeyed(EquisizeKeyedHeader), equisizeUnkeyed(EquisizedUnkeyedHeader)
-    indirect case uniformUnkeyed(UniformUnkeyedHeader)
 }
 
 extension Header {
@@ -44,15 +43,9 @@ struct RegularUnkeyedHeader {
 }
 
 struct EquisizedUnkeyedHeader {
-    var size: Int, count: Int
+    var itemSize: Int, subheader: Header?, count: Int
 
-    var totalPayloadSize: Int { size * count }
-}
-
-struct UniformUnkeyedHeader {
-    var itemSize: Int, subheader: Header, count: Int
-
-    var payloadSize: Int { itemSize - subheader.size }
+    var payloadSize: Int { itemSize - (subheader?.size ?? 0) }
     var totalPayloadSize: Int { payloadSize * count }
 }
 
@@ -72,8 +65,7 @@ extension Header {
         case .regularKeyed: return .regularKeyed
         case .regularUnkeyed: return .regularUnkeyed
         case let .equisizeKeyed(header): return header.subheader != nil ? .uniformKeyed : .equisizeKeyed
-        case .equisizeUnkeyed: return .equisizeUnkeyed
-        case .uniformUnkeyed: return .uniformUnkeyed
+        case let .equisizeUnkeyed(header): return header.subheader != nil ? .uniformUnkeyed : .equisizeUnkeyed
         }
     }
 }

@@ -50,16 +50,17 @@ struct UnkeyedOptimizer: EncodingOptimizer {
 
         switch header {
         case let .equisizeUnkeyed(header):
-            let size = header.size
-            for value in values {
-                value.write(to: data.prefix(size))
-                data.removeFirst(size)
-            }
-        case let .uniformUnkeyed(header):
-            let size = header.itemSize - header.subheader.size
-            for value in values {
-                value.writePayload(to: data.prefix(size))
-                data.removeFirst(size)
+            let size = header.payloadSize
+            if header.subheader != nil {
+                for value in values {
+                    value.writePayload(to: data.prefix(size))
+                    data.removeFirst(size)
+                }
+            } else {
+                for value in values {
+                    value.write(to: data.prefix(size))
+                    data.removeFirst(size)
+                }
             }
         default:
             assert(header.tag == .regularUnkeyed)
@@ -85,7 +86,7 @@ private extension UnkeyedOptimizer {
         guard maxSize > 0 else {
             return nil
         }
-        return (.equisizeUnkeyed(.init(size: maxSize, count: values.count)), maxSize * values.count)
+        return (.equisizeUnkeyed(.init(itemSize: maxSize, subheader: nil, count: values.count)), maxSize * values.count)
     }
 
     func uniformSize() -> (header: Header, payload: Int)? {
@@ -93,6 +94,6 @@ private extension UnkeyedOptimizer {
             return nil
         }
 
-        return (.uniformUnkeyed(.init(itemSize: itemSize, subheader: subheader, count: values.count)), (itemSize - subheader.size) * values.count)
+        return (.equisizeUnkeyed(.init(itemSize: itemSize, subheader: subheader, count: values.count)), (itemSize - subheader.size) * values.count)
     }
 }

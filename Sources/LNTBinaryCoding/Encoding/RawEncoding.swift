@@ -24,9 +24,11 @@ extension Header {
         case let .regularUnkeyed(header):
             return 2 + header.sizes.lazy.map { $0.vsuiSize }.reduce(0, +)
         case let .equisizeUnkeyed(header):
-            return 1 + header.size.vsuiSize + header.count.vsuiSize
-        case let .uniformUnkeyed(header):
-            return 1 + header.itemSize.vsuiSize + header.subheader.size + header.count.vsuiSize
+            if let subheader = header.subheader {
+                return 1 + header.itemSize.vsuiSize + subheader.size + header.count.vsuiSize
+            } else {
+                return 1 + header.payloadSize.vsuiSize + header.count.vsuiSize
+            }
         }
     }
 
@@ -66,12 +68,9 @@ extension Header {
             }
             append(0x01)
         case let .equisizeUnkeyed(header):
-            header.size.write(to: &data)
-            header.count.write(to: &data)
-        case let .uniformUnkeyed(header):
             header.itemSize.write(to: &data)
             header.count.write(to: &data)
-            header.subheader.write(to: &data)
+            header.subheader?.write(to: &data)
         }
     }
 }
